@@ -1,13 +1,24 @@
 // Copyright (c) Alexandre Mutel. All rights reserved.
-// Licensed under the BSD-Clause 2 license. 
+// Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
 
+#nullable disable
+
 using Scriban.Parsing;
+using System.Collections.Generic;
 
 namespace Scriban.Syntax
 {
-    public class ScriptPage : ScriptNode
+#if SCRIBAN_PUBLIC
+    public
+#else
+    internal
+#endif
+    partial class ScriptPage : ScriptNode
     {
+        private ScriptFrontMatter _frontMatter;
+        private ScriptBlockStatement _body;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="ScriptPage"/> class.
         /// </summary>
@@ -21,18 +32,34 @@ namespace Scriban.Syntax
         /// <remarks>
         /// Note that this code block is not executed when evaluating this page. It has to be evaluated separately (usually before evaluating the page).
         /// </remarks>
-        public ScriptBlockStatement FrontMatter { get; set; }
+        public ScriptFrontMatter FrontMatter
+        {
+            get => _frontMatter;
+            set => ParentToThis(ref _frontMatter, value);
+        }
 
-        public ScriptBlockStatement Body { get; set; }
+        public ScriptBlockStatement Body
+        {
+            get => _body;
+            set => ParentToThis(ref _body, value);
+        }
 
         public override object Evaluate(TemplateContext context)
         {
-            return context.Evaluate(Body);
+            context.FlowState = ScriptFlowState.None;
+            try
+            {
+                return context.Evaluate(Body);
+            }
+            finally
+            {
+                context.FlowState = ScriptFlowState.None;
+            }
         }
 
-        public override void Write(TemplateRewriterContext context)
+        public override void PrintTo(ScriptPrinter printer)
         {
-            context.Write(Body);
+            printer.Write(Body);
         }
     }
 }

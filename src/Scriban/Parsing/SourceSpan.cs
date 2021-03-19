@@ -1,12 +1,17 @@
-﻿// Copyright (c) Alexandre Mutel. All rights reserved.
-// Licensed under the BSD-Clause 2 license. 
+// Copyright (c) Alexandre Mutel. All rights reserved.
+// Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
 namespace Scriban.Parsing
 {
     /// <summary>
     /// Defines the precise source location.
     /// </summary>
-    public struct SourceSpan
+#if SCRIBAN_PUBLIC
+    public
+#else
+    internal
+#endif
+    struct SourceSpan
     {
         public SourceSpan(string fileName, TextPosition start, TextPosition end)
         {
@@ -17,9 +22,13 @@ namespace Scriban.Parsing
 
         public string FileName { get; set; }
 
+        public bool IsEmpty => FileName == null;
+
         public TextPosition Start { get; set; }
 
         public TextPosition End { get; set; }
+
+        public int Length => End.Offset - Start.Offset + 1;
 
         public override string ToString()
         {

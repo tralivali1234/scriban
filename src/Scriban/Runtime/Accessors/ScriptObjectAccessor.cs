@@ -1,5 +1,5 @@
 // Copyright (c) Alexandre Mutel. All rights reserved.
-// Licensed under the BSD-Clause 2 license. 
+// Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
 
 using System.Collections.Generic;
@@ -7,7 +7,12 @@ using Scriban.Parsing;
 
 namespace Scriban.Runtime.Accessors
 {
-    public class ScriptObjectAccessor : IObjectAccessor
+#if SCRIBAN_PUBLIC
+    public
+#else
+    internal
+#endif
+    class ScriptObjectAccessor : IObjectAccessor
     {
         public static readonly IObjectAccessor Default = new ScriptObjectAccessor();
 
@@ -33,7 +38,7 @@ namespace Scriban.Runtime.Accessors
 
         public bool TrySetValue(TemplateContext context, SourceSpan span, object target, string member, object value)
         {
-            return ((IScriptObject)target).TrySetValue(member, value, false);
+            return ((IScriptObject)target).TrySetValue(context, span, member, value, false);
         }
     }
 }

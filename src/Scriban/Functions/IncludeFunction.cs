@@ -1,6 +1,9 @@
 // Copyright (c) Alexandre Mutel. All rights reserved.
-// Licensed under the BSD-Clause 2 license. 
+// Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
+
+#nullable disable
+
 using System;
 using System.Collections.Generic;
 using Scriban.Parsing;
@@ -12,7 +15,12 @@ namespace Scriban.Functions
     /// <summary>
     /// The include function available through the function 'include' in scriban.
     /// </summary>
-    public sealed class IncludeFunction : IScriptCustomFunction
+#if SCRIBAN_PUBLIC
+    public
+#else
+    internal
+#endif
+    sealed partial class IncludeFunction : IScriptCustomFunction
     {
         public IncludeFunction()
         {
@@ -25,7 +33,7 @@ namespace Scriban.Functions
                 throw new ScriptRuntimeException(callerContext.Span, "Expecting at least the name of the template to include for the <include> function");
             }
 
-            var templateName = context.ToString(callerContext.Span, arguments[0]);
+            var templateName = context.ObjectToString(arguments[0]);
 
             // If template name is empty, throw an exception
             if (string.IsNullOrEmpty(templateName))
@@ -54,20 +62,94 @@ namespace Scriban.Functions
             {
                 throw new ScriptRuntimeException(callerContext.Span, $"Unexpected exception while getting the path for the include name `{templateName}`", ex);
             }
-            // If template name is empty, throw an exception
+            // If template path is empty (probably because template doesn't exist), throw an exception
             if (templatePath == null)
             {
-                throw new ScriptRuntimeException(callerContext.Span, $"Include template path cannot be null");
+                throw new ScriptRuntimeException(callerContext.Span, $"Include template path is null for `{templateName}");
             }
 
-            // Compute a new parameters for the include
-            var newParameters = new ScriptArray(arguments.Count - 1);
-            for (int i = 1; i < arguments.Count; i++)
+            string indent = null;
+
+            // Handle indent
+            if (context.IndentWithInclude)
             {
-                newParameters[i] = arguments[i];
-            }
+                // Find the statement for the include
+                var current = callerContext.Parent;
+                while (current != null && !(current is ScriptStatement))
+                {
+                    current = current.Parent;
+                }
 
-            context.SetValue(ScriptVariable.Arguments, newParameters, true);
+                // Find the RawStatement preceding this include
+                ScriptNode childNode = null;
+                bool shouldContinue = true;
+                while (shouldContinue && current != null)
+                {
+                    if (current is ScriptList<ScriptStatement> statementList && childNode is ScriptStatement childStatement)
+                    {
+                        var indexOf = statementList.IndexOf(childStatement);
+
+                        // Case for first indent, if it is not the first statement in the doc
+                        // it's not a valid indent
+                        if (indent != null && indexOf > 0)
+                        {
+                            indent = null;
+                            break;
+                        }
+
+                        for (int i = indexOf - 1; i >= 0; i--)
+                        {
+                            var previousStatement = statementList[i];
+                            if (previousStatement is ScriptEscapeStatement escapeStatement && escapeStatement.IsEntering)
+                            {
+                                if (i > 0 && statementList[i - 1] is ScriptRawStatement rawStatement)
+                                {
+
+                                    var text = rawStatement.Text;
+                                    for (int j = text.Length - 1; j >= 0; j--)
+                                    {
+                                        var c = text[j];
+                                        if (c == '\n')
+                                        {
+                                            shouldContinue = false;
+                                            indent = text.Substring(j + 1);
+                                            break;
+                                        }
+
+                                        if (!char.IsWhiteSpace(c))
+                                        {
+                                            shouldContinue = false;
+                                            break;
+                                        }
+
+                                        if (j == 0)
+                                        {
+                                            // We have a raw statement that has only white spaces
+                                            // It could be the first raw statement of the document
+                                            // so we continue but we handle it later
+                                            indent = text.ToString();
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    shouldContinue = false;
+                                }
+
+                                break;
+                            }
+                        }
+                    }
+
+                    childNode = current;
+                    current = childNode.Parent;
+                }
+
+                if (string.IsNullOrEmpty(indent))
+                {
+                    indent = null;
+                }
+            }
 
             Template template;
 
@@ -104,21 +186,63 @@ namespace Scriban.Functions
             }
 
             // Make sure that we cannot recursively include a template
-
-            context.PushOutput();
             object result = null;
+            context.EnterRecursive(callerContext);
+
+            var previousIndent = context.CurrentIndent;
+            context.CurrentIndent = indent;
+            context.PushOutput();
+            var previousArguments = context.GetValue(ScriptVariable.Arguments);
             try
             {
-                context.EnterRecursive(callerContext);
+                context.SetValue(ScriptVariable.Arguments, arguments, true, true);
+
+                if (indent != null)
+                {
+                    // We reset before and after the fact that we have a new line
+                    context.ResetPreviousNewLine();
+                }
                 result = template.Render(context);
-                context.ExitRecursive(callerContext);
+                if (indent != null)
+                {
+                    context.ResetPreviousNewLine();
+                }
             }
             finally
             {
                 context.PopOutput();
+                context.CurrentIndent = previousIndent;
+                context.ExitRecursive(callerContext);
+
+                // Remove the arguments
+                context.DeleteValue(ScriptVariable.Arguments);
+                if (previousArguments != null)
+                {
+                    // Restore them if necessary
+                    context.SetValue(ScriptVariable.Arguments, previousArguments, true);
+                }
             }
 
             return result;
+        }
+
+        public int RequiredParameterCount => 1;
+
+        public int ParameterCount => 1;
+
+        public ScriptVarParamKind VarParamKind => ScriptVarParamKind.Direct;
+
+        public Type ReturnType => typeof(object);
+
+        public ScriptParameterInfo GetParameterInfo(int index)
+        {
+            if (index == 0) return new ScriptParameterInfo(typeof(string), "template_name");
+            return new ScriptParameterInfo(typeof(object), "value");
+        }
+
+        public int GetParameterIndexByName(string name)
+        {
+            throw new NotImplementedException();
         }
     }
 }

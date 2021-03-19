@@ -1,6 +1,8 @@
 // Copyright (c) Alexandre Mutel. All rights reserved.
-// Licensed under the BSD-Clause 2 license. 
+// Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
@@ -13,7 +15,12 @@ using Scriban.Syntax;
 
 namespace Scriban.Parsing
 {
-    public partial class Parser
+#if SCRIBAN_PUBLIC
+    public
+#else
+    internal
+#endif
+    partial class Parser
     {
         private void ParseLiquidStatement(string identifier, ScriptStatement parent, ref ScriptStatement statement, ref bool hasEnd, ref bool nextStatement)
         {
@@ -97,7 +104,7 @@ namespace Scriban.Parsing
                     break;
 
                 case "if":
-                    statement = ParseIfStatement(false, false);
+                    statement = ParseIfStatement(false);
                     break;
 
                 case "ifchanged":
@@ -106,7 +113,7 @@ namespace Scriban.Parsing
 
                 case "unless":
                     CheckNotInCase(parent, startToken);
-                    statement = ParseIfStatement(true, false);
+                    statement = ParseIfStatement(true);
                     break;
 
                 case "else":
@@ -128,17 +135,26 @@ namespace Scriban.Parsing
                             ((ScriptWhenStatement)parentCondition).Next = nextCondition;
                         }
                     }
+                    else if (identifier == "else" && parent is ScriptForStatement forStatement)
+                    {
+                        forStatement.Else = (ScriptElseStatement)nextCondition;
+                    }
                     else
                     {
                         nextStatement = false;
 
                         // unit test: 201-if-else-error3.txt
-                        LogError(startToken, "A else condition must be preceded by another if/else/when condition");
+                        LogError(startToken,
+                            identifier == "else"
+                                ? "A else condition must be preceded by another if/else/unless condition or a for loop."
+                                : "A else condition must be preceded by another if/else/unless.");
                     }
                     hasEnd = true;
                     break;
                 case "for":
-                    statement = ParseForStatement<ScriptForStatement>();
+                    var localForStatement = ParseForStatement<ScriptForStatement>();
+                    localForStatement.SetContinue = true;
+                    statement = localForStatement;
                     break;
                 case "tablerow":
                     statement = ParseForStatement<ScriptTableRowStatement>();
@@ -147,15 +163,18 @@ namespace Scriban.Parsing
                     statement = ParseLiquidCycleStatement();
                     break;
                 case "break":
-                    statement = Open<ScriptBreakStatement>();
-                    NextToken();
-                    ExpectEndOfStatement(statement);
+                    var breakStatement = Open<ScriptBreakStatement>();
+                    statement = breakStatement;
+                    ExpectAndParseKeywordTo(breakStatement.BreakKeyword);
+                    ExpectEndOfStatement();
                     Close(statement);
                     break;
                 case "continue":
-                    statement = Open<ScriptContinueStatement>();
-                    NextToken();
-                    ExpectEndOfStatement(statement);
+                    var continueStatement =  Open<ScriptContinueStatement>();
+                    statement = continueStatement;
+                    ExpectAndParseKeywordTo(continueStatement.ContinueKeyword); // Parse continue keyword
+                    ExpectEndOfStatement();
+                    FlushTriviasToLastTerminal();
                     Close(statement);
                     break;
                 case "assign":
@@ -170,7 +189,7 @@ namespace Scriban.Parsing
                         // Try to parse an expression
                         var expressionStatement = ParseExpressionStatement();
                         // If we don't have an assign expression, this is not a valid assign
-                        if (!(expressionStatement.Expression is ScriptAssignExpression))
+                        if (!(expressionStatement is ScriptExpressionStatement exprStatementFinal && exprStatementFinal.Expression is ScriptAssignExpression))
                         {
                             LogError(token, "Expecting an assign expression: <variable> = <expression>");
                         }
@@ -201,25 +220,16 @@ namespace Scriban.Parsing
 
             if (pendingStart != null)
             {
-                if (_isKeepTrivia)
-                {
-                    _trivias.Add(new ScriptTrivia(CurrentSpan, ScriptTriviaType.End));
-                }
-
+                var endStatement = Open<ScriptEndStatement>();
                 NextToken();
+                statement =  Close(endStatement);
 
                 hasEnd = true;
-                nextStatement = false;
+                nextStatement = true;
 
                 if (startStatement == null)
                 {
                     LogError(startToken, $"Unable to find a pending {pendingStart} for this `{identifier}`");
-                }
-
-                ExpectEndOfStatement(startStatement);
-                if (_isKeepTrivia)
-                {
-                    FlushTrivias(startStatement, false);
                 }
             }
         }
@@ -238,7 +248,7 @@ namespace Scriban.Parsing
 
             ScriptArrayInitializerExpression arrayInit = null;
 
-            // Parse cycle without group: cycle "a", "b", "c" => transform to scriban: array.cycle ["a", "b", "c"] 
+            // Parse cycle without group: cycle "a", "b", "c" => transform to scriban: array.cycle ["a", "b", "c"]
             // Parse cycle with group: cycle "group1": "a", "b", "c" => transform to scriban: array.cycle ["a", "b", "c"] "group1"
 
             bool isFirst = true;
@@ -248,9 +258,12 @@ namespace Scriban.Parsing
 
                 if (isFirst && Current.Type == TokenType.Colon)
                 {
-                    NextToken(); // Skip :
                     var namedArg = Open<ScriptNamedArgument>();
-                    namedArg.Name = "group";
+                    namedArg.Name = new ScriptVariableGlobal("group");
+
+                    namedArg.ColonToken = ScriptToken.Colon();
+                    ExpectAndParseTokenTo(namedArg.ColonToken, TokenType.Colon); // Parse :
+
                     namedArg.Value = value;
                     Close(namedArg);
                     namedArg.Span = value.Span;
@@ -288,7 +301,7 @@ namespace Scriban.Parsing
 
             Close(functionCall);
 
-            ExpectEndOfStatement(statement);
+            ExpectEndOfStatement();
             return Close(statement);
         }
 
@@ -303,7 +316,7 @@ namespace Scriban.Parsing
             // NOTE: We were previously performing the following checks
             // but as liquid doesn't have a strict syntax, we are instead not enforcing anykind of rules
             // so that the parser can still read custom liquid tags/object expressions, assuming that
-            // they are not using fancy argument syntaxes (which are unfortunately allowed in liquid)  
+            // they are not using fancy argument syntaxes (which are unfortunately allowed in liquid)
 
             //var functionCall = expressionStatement.Expression as ScriptFunctionCall;
             //// Otherwise it is an expression statement
@@ -328,8 +341,9 @@ namespace Scriban.Parsing
         private ScriptStatement ParseLiquidIfChanged()
         {
             var statement = Open<ScriptIfStatement>();
+            statement.IfKeyword.Span = CurrentSpan;
             NextToken(); // skip ifchanged token
-            statement.Condition = new ScriptVariableLoop(ScriptVariable.LoopChanged.Name);
+            statement.Condition = new ScriptMemberExpression() { Target = ScriptVariable.Create(ScriptVariable.ForObject.BaseName, ScriptVariableScope.Loop), Member = ScriptVariable.Create("changed", ScriptVariableScope.Global) };
             statement.Then = ParseBlockStatement(statement);
             Close(statement);
             statement.Condition.Span = statement.Span;
@@ -345,7 +359,7 @@ namespace Scriban.Parsing
             binaryExpression.Left = ExpectAndParseVariable(incdecStatement);
             binaryExpression.Right = new ScriptLiteral() {Span = binaryExpression.Span, Value = 1};
             binaryExpression.Operator = isDec ? ScriptBinaryOperator.Substract : ScriptBinaryOperator.Add;
-            ExpectEndOfStatement(incdecStatement);
+            ExpectEndOfStatement();
 
             incdecStatement.Expression = binaryExpression;
 
@@ -392,7 +406,7 @@ namespace Scriban.Parsing
                     assignExpression.Target = new ScriptIndexerExpression()
                     {
                         Target = new ScriptThisExpression {Span = CurrentSpan},
-                        Index = templateName
+                        Index = (ScriptExpression)templateName?.Clone(),
                     };
 
                     assignExpression.Value = ExpectAndParseExpression(include, mode: ParseExpressionMode.BasicExpression);
@@ -420,13 +434,14 @@ namespace Scriban.Parsing
                     forStatement.Variable = new ScriptIndexerExpression()
                     {
                         Target = new ScriptThisExpression {Span = CurrentSpan},
-                        Index = templateName
+                        Index = (ScriptExpression)templateName?.Clone(),
                     };
 
                     forStatement.Iterator = ExpectAndParseExpression(include, mode: ParseExpressionMode.BasicExpression);
 
                     forStatement.Body = new ScriptBlockStatement() {Span = include.Span};
                     forStatement.Body.Statements.Add(includeStatement);
+                    forStatement.Body.Statements.Add(new ScriptEndStatement());
                     Close(forStatement);
                 }
 
@@ -473,7 +488,7 @@ namespace Scriban.Parsing
                     }
                 }
 
-                ExpectEndOfStatement(includeStatement);
+                ExpectEndOfStatement();
 
                 // If we only have an include for, return it directly
                 if (forStatement != null)
@@ -493,7 +508,7 @@ namespace Scriban.Parsing
                 }
             }
 
-            ExpectEndOfStatement(includeStatement);
+            ExpectEndOfStatement();
             return Close(includeStatement);
         }
    }

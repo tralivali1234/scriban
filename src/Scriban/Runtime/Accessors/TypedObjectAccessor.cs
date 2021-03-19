@@ -1,6 +1,9 @@
 // Copyright (c) Alexandre Mutel. All rights reserved.
-// Licensed under the BSD-Clause 2 license. 
+// Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
+
+#nullable disable
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -10,7 +13,12 @@ using Scriban.Parsing;
 
 namespace Scriban.Runtime.Accessors
 {
-    public class TypedObjectAccessor : IObjectAccessor
+#if SCRIBAN_PUBLIC
+    public
+#else
+    internal
+#endif
+    class TypedObjectAccessor : IObjectAccessor
     {
         private readonly MemberFilterDelegate _filter;
         private readonly Type _type;
@@ -76,20 +84,22 @@ namespace Scriban.Runtime.Accessors
                     var propertyAccessor = (PropertyInfo)memberAccessor;
                     propertyAccessor.SetValue(target, value);
                 }
+
+                return true;
             }
-            return true;
+            return false;
         }
 
         private void PrepareMembers()
         {
-            var type = this._type.GetTypeInfo();
+            var type = this._type;
 
             while (type != null)
             {
-                foreach (var field in type.GetDeclaredFields())
+                foreach (var field in type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
                 {
                     var keep = field.GetCustomAttribute<ScriptMemberIgnoreAttribute>() == null;
-                    if (keep && !field.IsStatic && field.IsPublic && (_filter == null || _filter(field)))
+                    if (keep && !field.IsStatic && field.IsPublic && !field.IsLiteral && (_filter == null || _filter(field)))
                     {
                         var newFieldName = Rename(field);
                         if (string.IsNullOrEmpty(newFieldName))
@@ -104,10 +114,13 @@ namespace Scriban.Runtime.Accessors
                     }
                 }
 
-                foreach (var property in type.GetDeclaredProperties())
+                foreach (var property in type.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
                 {
                     var keep = property.GetCustomAttribute<ScriptMemberIgnoreAttribute>() == null;
-                    if (keep && property.CanRead && !property.GetGetMethod().IsStatic && property.GetGetMethod().IsPublic && (_filter == null || _filter(property)))
+
+                    // Workaround with .NET Core, extension method is not working (retuning null despite doing property.GetMethod), so we need to inline it here
+                    var getMethod = property.GetMethod;
+                    if (keep && property.CanRead && !getMethod.IsStatic && getMethod.IsPublic && (_filter == null || _filter(property)))
                     {
                         var newPropertyName = Rename(property);
                         if (string.IsNullOrEmpty(newPropertyName))
@@ -126,7 +139,7 @@ namespace Scriban.Runtime.Accessors
                 {
                     break;
                 }
-                type = type.BaseType.GetTypeInfo();
+                type = type.BaseType;
             }
         }
 

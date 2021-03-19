@@ -3,7 +3,10 @@ List of all the builtin <array> functions:
  add_range
  compact
  concat
+ contains
  cycle
+ each
+ filter
  first
  insert_at
  join
@@ -27,21 +30,30 @@ List of all the builtin <math> functions:
  minus
  modulo
  plus
+ random
  round
  times
+ uuid
 
 List of all the builtin <string> functions:
  append
+ base64_decode
+ base64_encode
  capitalize
  capitalizewords
  contains
  downcase
+ empty
  ends_with
+ escape
  handleize
  hmac_sha1
  hmac_sha256
+ literal
  lstrip
  md5
+ pad_left
+ pad_right
  pluralize
  prepend
  remove
@@ -58,9 +70,14 @@ List of all the builtin <string> functions:
  starts_with
  strip
  strip_newlines
+ to_double
+ to_float
+ to_int
+ to_long
  truncate
  truncatewords
  upcase
+ whitespace
 
 List of all the builtin <date> functions:
  add_days
@@ -87,9 +104,13 @@ List of all the builtin <timespan> functions:
 
 List of all the builtin <object> functions:
  default
+ eval
+ eval_template
+ format
  has_key
  has_value
  keys
+ kind
  size
  typeof
  values
@@ -97,6 +118,7 @@ List of all the builtin <object> functions:
 List of all the builtin <regex> functions:
  escape
  match
+ matches
  replace
  split
  unescape

@@ -23,6 +23,8 @@ Array functions available through the object 'array' in scriban.
 - [`array.compact`](#arraycompact)
 - [`array.concat`](#arrayconcat)
 - [`array.cycle`](#arraycycle)
+- [`array.each`](#arrayeach)
+- [`array.filter`](#arrayfilter)
 - [`array.first`](#arrayfirst)
 - [`array.insert_at`](#arrayinsert_at)
 - [`array.join`](#arrayjoin)
@@ -35,6 +37,7 @@ Array functions available through the object 'array' in scriban.
 - [`array.size`](#arraysize)
 - [`array.sort`](#arraysort)
 - [`array.uniq`](#arrayuniq)
+- [`array.contains`](#arraycontains)
 
 [:top:](#builtins)
 ### `array.add`
@@ -91,7 +94,7 @@ The concatenation of the two input lists
 
 > **input**
 ```scriban-html
-{{ [1, 2, 3] | array.concat [4, 5] }}
+{{ [1, 2, 3] | array.add_range [4, 5] }}
 ```
 > **output**
 ```html
@@ -195,8 +198,70 @@ two
 three
 one
 ```
-`cycle` accepts a parameter called cycle group in cases where you need multiple cycle blocks in one template. 
+`cycle` accepts a parameter called cycle group in cases where you need multiple cycle blocks in one template.
 If no name is supplied for the cycle group, then it is assumed that multiple calls with the same parameters are one group.
+
+[:top:](#builtins)
+### `array.each`
+
+```
+array.each <list> <function>
+```
+
+#### Description
+
+Applies the specified function to each element of the input.
+
+#### Arguments
+
+- `list`: An input list
+- `function`: The function to apply to each item in the list
+
+#### Returns
+
+Returns a list with each item being transformed by the function.
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ [" a", " 5", "6 "] | array.each @string.strip }}
+```
+> **output**
+```html
+["a", "5", "6"]
+```
+
+[:top:](#builtins)
+### `array.filter`
+
+```
+array.filter <list> <function>
+```
+
+#### Description
+
+Filters the input list according the supplied filter function.
+
+#### Arguments
+
+- `list`: An input list
+- `function`: The function used to test each elemement of the list
+
+#### Returns
+
+Returns a new list which contains only those elements which match the filter function.
+
+#### Examples
+
+> **input**
+```scriban-html
+{{["", "200", "","400"] | array.filter @string.empty}}
+```
+> **output**
+```html
+["", ""]
+```
 
 [:top:](#builtins)
 ### `array.first`
@@ -257,14 +322,14 @@ A new list with the element inserted.
 ```
 > **output**
 ```html
-[a, b, Yo, c]
+["a", "b", "Yo", "c"]
 ```
 
 [:top:](#builtins)
 ### `array.join`
 
 ```
-array.join <list> <delimiter>
+array.join <list> <delimiter> <function>?
 ```
 
 #### Description
@@ -275,6 +340,7 @@ Joins the element of a list separated by a delimiter string and return the conca
 
 - `list`: The input list
 - `delimiter`: The delimiter string to use to separate elements in the output string
+- `function`: An optional function that will receive the string representation of the item to join and can transform the text before joining.
 
 #### Returns
 
@@ -376,13 +442,13 @@ Accepts an array element's attribute as a parameter and creates an array out of 
 
 > **input**
 ```scriban-html
-{{ 
+{{
 products = [{title: "orange", type: "fruit"}, {title: "computer", type: "electronics"}, {title: "sofa", type: "furniture"}]
 products | array.map "type" | array.uniq | array.sort }}
 ```
 > **output**
 ```html
-[electronics, fruit, furniture]
+["electronics", "fruit", "furniture"]
 ```
 
 [:top:](#builtins)
@@ -538,7 +604,7 @@ A list sorted according to the value of each element or the value of the specifi
 
 #### Examples
 
-Sorts by element's value: 
+Sorts by element's value:
 > **input**
 ```scriban-html
 {{ [10, 2, 6] | array.sort }}
@@ -547,7 +613,7 @@ Sorts by element's value:
 ```html
 [2, 6, 10]
 ```
-Sorts by elements member's value: 
+Sorts by elements member's value:
 > **input**
 ```scriban-html
 {{
@@ -557,7 +623,7 @@ products | array.sort "title" | array.map "title"
 ```
 > **output**
 ```html
-[computer, orange, sofa]
+["computer", "orange", "sofa"]
 ```
 
 [:top:](#builtins)
@@ -589,15 +655,46 @@ A list of unique elements of the input `list`.
 ```html
 [1, 4, 5, 8]
 ```
+
+[:top:](#builtins)
+### `array.contains`
+
+```
+array.contains <list> <item>
+```
+
+#### Description
+
+Returns if an `list` contains an specifique element
+
+#### Arguments
+
+- `list`: the input list
+- `item`: the input item
+
+#### Returns
+
+**true** if element is in `list`; otherwise **false**
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ [1, 2, 3, 4] | array.contains 4 }}
+```
+> **output**
+```html
+true
+```
 [:top:](#builtins)
 
 ## `date` functions
 
-A datetime object represents an instant in time, expressed as a date and time of day. 
+A datetime object represents an instant in time, expressed as a date and time of day.
 
 | Name             | Description
 |--------------    |-----------------
-| `.year`          | Gets the year of a date object 
+| `.year`          | Gets the year of a date object
 | `.month`         | Gets the month of a date object
 | `.day`           | Gets the day in the month of a date object
 | `.day_of_year`   | Gets the day within the year
@@ -615,6 +712,7 @@ Other comparison operators(`==`, `!=`, `<=`, `>=`, `<`, `>`) are also working wi
 
 A `timespan` and also the added to a `datetime` object.
 
+- [`date.now`](#datenow)
 - [`date.add_days`](#dateadd_days)
 - [`date.add_months`](#dateadd_months)
 - [`date.add_years`](#dateadd_years)
@@ -626,6 +724,35 @@ A `timespan` and also the added to a `datetime` object.
 - [`date.to_string`](#dateto_string)
 
 [:top:](#builtins)
+### `date.now`
+
+```
+date.now
+```
+
+#### Description
+
+Returns a datetime object of the current time, including the hour, minutes, seconds and milliseconds.
+
+#### Arguments
+
+
+#### Returns
+
+
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ date.now.year }}
+```
+> **output**
+```html
+2021
+```
+
+[:top:](#builtins)
 ### `date.add_days`
 
 ```
@@ -634,7 +761,7 @@ date.add_days <date> <days>
 
 #### Description
 
-Adds the specified number of days to the input date. 
+Adds the specified number of days to the input date.
 
 #### Arguments
 
@@ -665,7 +792,7 @@ date.add_months <date> <months>
 
 #### Description
 
-Adds the specified number of months to the input date. 
+Adds the specified number of months to the input date.
 
 #### Arguments
 
@@ -696,7 +823,7 @@ date.add_years <date> <years>
 
 #### Description
 
-Adds the specified number of years to the input date. 
+Adds the specified number of years to the input date.
 
 #### Arguments
 
@@ -727,7 +854,7 @@ date.add_hours <date> <hours>
 
 #### Description
 
-Adds the specified number of hours to the input date. 
+Adds the specified number of hours to the input date.
 
 #### Arguments
 
@@ -751,7 +878,7 @@ date.add_minutes <date> <minutes>
 
 #### Description
 
-Adds the specified number of minutes to the input date. 
+Adds the specified number of minutes to the input date.
 
 #### Arguments
 
@@ -775,7 +902,7 @@ date.add_seconds <date> <seconds>
 
 #### Description
 
-Adds the specified number of seconds to the input date. 
+Adds the specified number of seconds to the input date.
 
 #### Arguments
 
@@ -799,7 +926,7 @@ date.add_milliseconds <date> <millis>
 
 #### Description
 
-Adds the specified number of milliseconds to the input date. 
+Adds the specified number of milliseconds to the input date.
 
 #### Arguments
 
@@ -823,7 +950,7 @@ date.parse <text>
 
 #### Description
 
-Parses the specified input string to a date object. 
+Parses the specified input string to a date object.
 
 #### Arguments
 
@@ -855,54 +982,74 @@ date.to_string <datetime> <pattern> <culture>
 
 Converts a datetime object to a textual representation using the specified format string.
 
-By default, if you are using a date, it will use the format specified by `date.format` which defaults to /// `date.default_format` (readonly) which default to `%d %b %Y`
+By default, if you are using a date, it will use the format specified by `date.format` which defaults to `date.default_format` (readonly) which default to `%d %b %Y`
 
-You can override the format used for formatting all dates by assigning the a new format: `date.format = '%a /// %b %e %T %Y';`
+You can override the format used for formatting all dates by assigning the a new format: `date.format = '%a %b %e %T %Y';`
 
 You can recover the default format by using `date.format = date.default_format;`
 
-By default, the to_string format is using the **current culture**, but you can switch to an invariant /// culture by using the modifier `%g`
+By default, the to_string format is using the **current culture**, but you can switch to an invariant culture by using the modifier `%g`
 
 For example, using `%g %d %b %Y` will output the date using an invariant culture.
 
 If you are using `%g` alone, it will output the date with `date.format` using an invariant culture.
 
-Suppose that `date.now` would return the date `2013-09-12 22:49:27 +0530`, the following table explains the /// format modifiers:
+Suppose that `date.now` would return the date `2013-09-12 22:49:27 +0530`, the following table explains the format modifiers:
 
-| Format | Result        | Description
-|--------|---------------|--------------------------------------------
-| `"%a"` |  `"Thu"` 	   | Name of week day in short form of the
-| `"%A"` |  `"Thursday"` | Week day in full form of the time
-| `"%b"` |  `"Sep"` 	   | Month in short form of the time
-| `"%B"` |  `"September"`| Month in full form of the time
-| `"%c"` |               | Date and time (%a %b %e %T %Y)
-| `"%d"` |  `"12"` 	     | Day of the month of the time
-| `"%e"` |  `"12"`       | Day of the month, blank-padded ( 1..31)
-| `"%H"` |  `"22"`       | Hour of the time in 24 hour clock format
-| `"%I"` |  `"10"` 	     | Hour of the time in 12 hour clock format
-| `"%j"` |               | Day of the year (001..366) (3 digits, left padded with zero)
-| `"%m"` |  `"09"` 	     | Month of the time
-| `"%M"` |  `"49"` 	     | Minutes of the time (2 digits, left padded with zero e.g 01 02)
-| `"%p"` |  `"PM"` 	     | Gives AM / PM of the time
-| `"%S"` |  `"27"` 	     | Seconds of the time
-| `"%U"` |               | Week number of the current year, starting with the first Sunday as the first day /// of the first week (00..53)
-| `"%W"` |               | Week number of the current year, starting with the first Monday as the first day /// of the first week (00..53)
-| `"%w"` |  `"4"` 	     | Day of week of the time
-| `"%x"` |               | Preferred representation for the date alone, no time
-| `"%X"` |               | Preferred representation for the time alone, no date
-| `"%y"` |  `"13"` 	     | Gives year without century of the time
-| `"%Y"` |  `"2013"`     | Year of the time
-| `"%Z"` |  `"IST"` 	   | Gives Time Zone of the time
-| `"%%"` |  `"%"`        | Output the character `%`
+| Format | Result            | Description
+|--------|-------------------|--------------------------------------------
+| `"%a"` |  `"Thu"`          | Name of week day in short form of the
+| `"%A"` |  `"Thursday"`     | Week day in full form of the time
+| `"%b"` |  `"Sep"`          | Month in short form of the time
+| `"%B"` |  `"September"`    | Month in full form of the time
+| `"%c"` |                   | Date and time (%a %b %e %T %Y)
+| `"%C"` |  `"20"`           | Century of the time
+| `"%d"` |  `"12"`           | Day of the month of the time
+| `"%D"` |  `"09/12/13"`     | Date (%m/%d/%y)
+| `"%e"` |  `"12"`           | Day of the month, blank-padded ( 1..31)
+| `"%F"` |  `"2013-09-12"`   | ISO 8601 date (%Y-%m-%d)
+| `"%h"` |  `"Sep"`          | Alias for %b
+| `"%H"` |  `"22"`           | Hour of the time in 24 hour clock format
+| `"%I"` |  `"10"`           | Hour of the time in 12 hour clock format
+| `"%j"` |  `"255"`          | Day of the year (001..366) (3 digits, left padded with zero)
+| `"%k"` |  `"22"`           | Hour of the time in 24 hour clock format, blank-padded ( 0..23)
+| `"%l"` |  `"10"`           | Hour of the time in 12 hour clock format, blank-padded ( 0..12)
+| `"%L"` |  `"000"`          | Millisecond of the time (3 digits, left padded with zero)
+| `"%m"` |  `"09"`           | Month of the time
+| `"%M"` |  `"49"`           | Minutes of the time (2 digits, left padded with zero e.g 01 02)
+| `"%n"` |                   | Newline character (\n)
+| `"%N"` |  `"000000000"`    | Nanoseconds of the time (9 digits, left padded with zero)
+| `"%p"` |  `"PM"`           | Gives AM / PM of the time
+| `"%P"` |  `"pm"`           | Gives am / pm of the time
+| `"%r"` |  `"10:49:27 PM"`  | Long time in 12 hour clock format (%I:%M:%S %p)
+| `"%R"` |  `"22:49"`        | Short time in 24 hour clock format (%H:%M)
+| `"%s"` |                   | Number of seconds since 1970-01-01 00:00:00 +0000
+| `"%S"` |  `"27"`           | Seconds of the time
+| `"%t"` |                   | Tab character (\t)
+| `"%T"` |  `"22:49:27"`     | Long time in 24 hour clock format (%H:%M:%S)
+| `"%u"` |  `"4"`            | Day of week of the time (from 1 for Monday to 7 for Sunday)
+| `"%U"` |  `"36"`           | Week number of the current year, starting with the first Sunday as the first day of the first week (00..53)
+| `"%v"` |  `"12-SEP-2013"`  | VMS date (%e-%b-%Y) (culture invariant)
+| `"%V"` |  `"37"`           | Week number of the current year according to ISO 8601 (01..53)
+| `"%W"` |  `"36"`           | Week number of the current year, starting with the first Monday as the first day of the first week (00..53)
+| `"%w"` |  `"4"`            | Day of week of the time (from 0 for Sunday to 6 for Saturday)
+| `"%x"` |                   | Preferred representation for the date alone, no time
+| `"%X"` |                   | Preferred representation for the time alone, no date
+| `"%y"` |  `"13"`           | Gives year without century of the time
+| `"%Y"` |  `"2013"`         | Year of the time
+| `"%Z"` |  `"IST"`          | Gives Time Zone of the time
+| `"%%"` |  `"%"`            | Output the character `%`
 
-Note that the format is using a good part of the ruby format ([source]/// (http://apidock.com/ruby/DateTime/strftime))
+Note that the format is using a good part of the ruby format ([source](http://apidock.com/ruby/DateTime/strftime))
 > **input**
 ```scriban-html
-{{ date.parse '2016/01/05' | date.to_string `%d %b %Y` }}
+{{ date.parse '2016/01/05' | date.to_string '%d %b %Y' }}
+{{ date.parse '2016/01/05' | date.to_string '%d %B %Y' 'fr-FR' }}
 ```
 > **output**
 ```html
 05 Jan 2016
+05 janvier 2016
 ```
 
 #### Arguments
@@ -1065,6 +1212,8 @@ Math functions available through the object 'math' in scriban.
 - [`math.plus`](#mathplus)
 - [`math.round`](#mathround)
 - [`math.times`](#mathtimes)
+- [`math.uuid`](#mathuuid)
+- [`math.random`](#mathrandom)
 
 [:top:](#builtins)
 ### `math.abs`
@@ -1200,7 +1349,7 @@ The largest integer less than or equal to the specified number.
 ### `math.format`
 
 ```
-math.format <value> <format>
+math.format <value> <format> <culture>?
 ```
 
 #### Description
@@ -1211,6 +1360,7 @@ Formats a number value with specified [.NET standard numeric format strings](htt
 
 - `value`: The input value
 - `format`: The format string.
+- `culture`: The culture as a string (e.g `en-US`). By default the culture from  is used
 
 #### Returns
 
@@ -1417,6 +1567,66 @@ The results of the multiplication: `value` * `with`
 ```html
 6
 ```
+
+[:top:](#builtins)
+### `math.uuid`
+
+```
+math.uuid
+```
+
+#### Description
+
+Creates a new UUID
+
+#### Arguments
+
+
+#### Returns
+
+The created UUID, ex. 2dc55d50-3f6c-446a-87d0-a5a4eed23269
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ math.uuid }}
+```
+> **output**
+```html
+1c0a4aa8-680e-4bd6-95e9-cdbec45ef057
+```
+
+[:top:](#builtins)
+### `math.random`
+
+```
+math.random <minValue> <maxValue>
+```
+
+#### Description
+
+Creates a random number
+
+#### Arguments
+
+- `minValue`: The inclusive lower bound of the random number returned
+- `maxValue`: The exclusive upper bound of the random number returned. maxValue must be greater than or equal to minValue.
+
+#### Returns
+
+A random number greater or equal to minValue and less than maxValue
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ math.random 1 10 }}
+```
+> **output**
+```html
+7
+```
 [:top:](#builtins)
 
 ## `object` functions
@@ -1424,11 +1634,15 @@ The results of the multiplication: `value` * `with`
 Object functions available through the builtin object 'object'.
 
 - [`object.default`](#objectdefault)
+- [`object.eval`](#objecteval)
+- [`object.eval_template`](#objecteval_template)
+- [`object.format`](#objectformat)
 - [`object.has_key`](#objecthas_key)
 - [`object.has_value`](#objecthas_value)
 - [`object.keys`](#objectkeys)
 - [`object.size`](#objectsize)
 - [`object.typeof`](#objecttypeof)
+- [`object.kind`](#objectkind)
 - [`object.values`](#objectvalues)
 
 [:top:](#builtins)
@@ -1445,7 +1659,7 @@ The `default` value is returned if the input `value` is null or an empty string 
 #### Arguments
 
 - `value`: The input value to check if it is null or an empty string.
-- `default`: The default alue to return if the input `value` is null or an empty string.
+- `default`: The default value to return if the input `value` is null or an empty string.
 
 #### Returns
 
@@ -1460,6 +1674,100 @@ The `default` value is returned if the input `value` is null or an empty string 
 > **output**
 ```html
 Yo
+```
+
+[:top:](#builtins)
+### `object.eval`
+
+```
+object.eval <value>
+```
+
+#### Description
+
+The evaluates a string as a scriban expression or evaluate the passed function or return the passed value.
+
+#### Arguments
+
+- `value`: The input value, either a scriban template in a string, or an alias function or directly a value.
+
+#### Returns
+
+The evaluation of the input value.
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ "1 + 2" | object.eval }}
+```
+> **output**
+```html
+3
+```
+
+[:top:](#builtins)
+### `object.eval_template`
+
+```
+object.eval_template <value>
+```
+
+#### Description
+
+The evaluates a string as a scriban template or evaluate the passed function or return the passed value.
+
+#### Arguments
+
+- `value`: The input value, either a scriban template in a string, or an alias function or directly a value.
+
+#### Returns
+
+The evaluation of the input value.
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ "This is a template text {{ 1 + 2 }}" | object.eval_template }}
+```
+> **output**
+```html
+This is a template text 3
+```
+
+[:top:](#builtins)
+### `object.format`
+
+```
+object.format <value> <format> <culture>?
+```
+
+#### Description
+
+Formats an object using specified format.
+
+#### Arguments
+
+- `value`: The input value
+- `format`: The format string.
+- `culture`: The culture as a string (e.g `en-US`). By default the culture from  is used
+
+#### Returns
+
+
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ 255 | object.format "X4" }}
+{{ 1523 | object.format "N2" "fr-FR" }}
+```
+> **output**
+```html
+00FF
+1 523,00
 ```
 
 [:top:](#builtins)
@@ -1551,7 +1859,7 @@ A list with the member names/key of the input object
 ```
 > **output**
 ```html
-[title, type]
+["title", "type"]
 ```
 
 [:top:](#builtins)
@@ -1563,7 +1871,7 @@ object.size <value>
 
 #### Description
 
-Returns the size of the input object. 
+Returns the size of the input object.
 - If the input object is a string, it will return the length
 - If the input is a list, it will return the number of elements
 - If the input is an object, it will return the number of members
@@ -1596,7 +1904,7 @@ object.typeof <value>
 
 #### Description
 
-Returns string representing the type of the input object. The type can be `string`, `boolean`, `number`, `array`, `iterator` and `object` 
+Returns string representing the type of the input object. The type can be `string`, `boolean`, `number`, `array`, `iterator` and `object`
 
 #### Arguments
 
@@ -1634,6 +1942,54 @@ object
 ```
 
 [:top:](#builtins)
+### `object.kind`
+
+```
+object.kind <value>
+```
+
+#### Description
+
+Returns string representing the type of the input object. The type can be `string`, `bool`, `number`, `array`, `iterator` and `object`
+
+#### Arguments
+
+- `value`: The input object.
+
+#### Returns
+
+
+
+#### Examples
+
+This function is newer than object.typeof and returns more detailed results about the types (e.g instead of `number`, returns `int` or `double`)
+
+> **input**
+```scriban-html
+{{ null | object.kind }}
+{{ true | object.kind }}
+{{ 1 | object.kind }}
+{{ 1.0 | object.kind }}
+{{ "text" | object.kind }}
+{{ 1..5 | object.kind }}
+{{ [1,2,3,4,5] | object.kind }}
+{{ {} | object.kind }}
+{{ object | object.kind }}
+```
+> **output**
+```html
+
+bool
+int
+double
+string
+range
+array
+object
+object
+```
+
+[:top:](#builtins)
 ### `object.values`
 
 ```
@@ -1660,7 +2016,7 @@ A list with the member values of the input object
 ```
 > **output**
 ```html
-[fruit, Orange]
+["fruit", "Orange"]
 ```
 [:top:](#builtins)
 
@@ -1670,6 +2026,7 @@ Functions exposed through `regex` builtin object.
 
 - [`regex.escape`](#regexescape)
 - [`regex.match`](#regexmatch)
+- [`regex.matches`](#regexmatches)
 - [`regex.replace`](#regexreplace)
 - [`regex.split`](#regexsplit)
 - [`regex.unescape`](#regexunescape)
@@ -1683,8 +2040,8 @@ regex.escape <pattern>
 
 #### Description
 
-Escapes a minimal set of characters (`\`, `*`, `+`, `?`, `|`, `{`, `[`, `(`,`)`, `^`, `$`,`.`, `#`, and white space) 
-by replacing them with their escape codes. 
+Escapes a minimal set of characters (`\`, `*`, `+`, `?`, `|`, `{`, `[`, `(`,`)`, `^`, `$`,`.`, `#`, and white space)
+by replacing them with their escape codes.
 This instructs the regular expression engine to interpret these characters literally rather than as metacharacters.
 
 #### Arguments
@@ -1715,17 +2072,17 @@ regex.match <text> <pattern> <options>?
 
 #### Description
 
-Searches an input string for a substring that matches a regular expression pattern and returns an array with the match occurences. 
+Searches an input string for a substring that matches a regular expression pattern and returns an array with the match occurences.
 
 #### Arguments
 
 - `text`: The string to search for a match.
 - `pattern`: The regular expression pattern to match.
 - `options`: A string with regex options, that can contain the following option characters (default is `null`):
-            - `i`: Specifies case-insensitive matching. 
+            - `i`: Specifies case-insensitive matching.
             - `m`: Multiline mode. Changes the meaning of `^` and `$` so they match at the beginning and end, respectively, of any line, and not just the beginning and end of the entire string.
             - `s`: Specifies single-line mode. Changes the meaning of the dot `.` so it matches every character (instead of every character except `\n`).
-            - `x`: Eliminates unescaped white space from the pattern and enables comments marked with `#`. 
+            - `x`: Eliminates unescaped white space from the pattern and enables comments marked with `#`.
 
 #### Returns
 
@@ -1739,9 +2096,46 @@ An array that contains all the match groups. The first group contains the entire
 ```
 > **output**
 ```html
-[is a text123, is, text123]
+["is a text123", "is", "text123"]
 ```
 Notice that the first element returned in the array is the entire regex match, followed by the regex group matches.
+
+[:top:](#builtins)
+### `regex.matches`
+
+```
+regex.matches <text> <pattern> <options>?
+```
+
+#### Description
+
+Searches an input string for multiple substrings that matches a regular expression pattern and returns an array with the match occurences.
+
+#### Arguments
+
+- `text`: The string to search for a match.
+- `pattern`: The regular expression pattern to match.
+- `options`: A string with regex options, that can contain the following option characters (default is `null`):
+            - `i`: Specifies case-insensitive matching.
+            - `m`: Multiline mode. Changes the meaning of `^` and `$` so they match at the beginning and end, respectively, of any line, and not just the beginning and end of the entire string.
+            - `s`: Specifies single-line mode. Changes the meaning of the dot `.` so it matches every character (instead of every character except `\n`).
+            - `x`: Eliminates unescaped white space from the pattern and enables comments marked with `#`.
+
+#### Returns
+
+An array of matches that contains all the match groups. The first group contains the entire match. The other elements contain regex matched groups `(..)`. An empty array returned means no match.
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ "this is a text123" | regex.matches `(\w+)` }}
+```
+> **output**
+```html
+[["this", "this"], ["is", "is"], ["a", "a"], ["text123", "text123"]]
+```
+Notice that the first element returned in the sub array is the entire regex match, followed by the regex group matches.
 
 [:top:](#builtins)
 ### `regex.replace`
@@ -1752,7 +2146,7 @@ regex.replace <text> <pattern> <replace> <options>?
 
 #### Description
 
-In a specified input string, replaces strings that match a regular expression pattern with a specified replacement string. 
+In a specified input string, replaces strings that match a regular expression pattern with a specified replacement string.
 
 #### Arguments
 
@@ -1760,10 +2154,10 @@ In a specified input string, replaces strings that match a regular expression pa
 - `pattern`: The regular expression pattern to match.
 - `replace`: The replacement string.
 - `options`: A string with regex options, that can contain the following option characters (default is `null`):
-            - `i`: Specifies case-insensitive matching. 
+            - `i`: Specifies case-insensitive matching.
             - `m`: Multiline mode. Changes the meaning of `^` and `$` so they match at the beginning and end, respectively, of any line, and not just the beginning and end of the entire string.
             - `s`: Specifies single-line mode. Changes the meaning of the dot `.` so it matches every character (instead of every character except `\n`).
-            - `x`: Eliminates unescaped white space from the pattern and enables comments marked with `#`. 
+            - `x`: Eliminates unescaped white space from the pattern and enables comments marked with `#`.
 
 #### Returns
 
@@ -1796,10 +2190,10 @@ Splits an input string into an array of substrings at the positions defined by a
 - `text`: The string to split.
 - `pattern`: The regular expression pattern to match.
 - `options`: A string with regex options, that can contain the following option characters (default is `null`):
-            - `i`: Specifies case-insensitive matching. 
+            - `i`: Specifies case-insensitive matching.
             - `m`: Multiline mode. Changes the meaning of `^` and `$` so they match at the beginning and end, respectively, of any line, and not just the beginning and end of the entire string.
             - `s`: Specifies single-line mode. Changes the meaning of the dot `.` so it matches every character (instead of every character except `\n`).
-            - `x`: Eliminates unescaped white space from the pattern and enables comments marked with `#`. 
+            - `x`: Eliminates unescaped white space from the pattern and enables comments marked with `#`.
 
 #### Returns
 
@@ -1813,7 +2207,7 @@ A string array.
 ```
 > **output**
 ```html
-[a, b, c, d]
+["a", "b", "c", "d"]
 ```
 
 [:top:](#builtins)
@@ -1851,13 +2245,17 @@ A string of characters with any escaped characters converted to their unescaped 
 
 String functions available through the builtin object 'string`.
 
+- [`string.escape`](#stringescape)
 - [`string.append`](#stringappend)
 - [`string.capitalize`](#stringcapitalize)
 - [`string.capitalizewords`](#stringcapitalizewords)
 - [`string.contains`](#stringcontains)
+- [`string.empty`](#stringempty)
+- [`string.whitespace`](#stringwhitespace)
 - [`string.downcase`](#stringdowncase)
 - [`string.ends_with`](#stringends_with)
 - [`string.handleize`](#stringhandleize)
+- [`string.literal`](#stringliteral)
 - [`string.lstrip`](#stringlstrip)
 - [`string.pluralize`](#stringpluralize)
 - [`string.prepend`](#stringprepend)
@@ -1873,6 +2271,10 @@ String functions available through the builtin object 'string`.
 - [`string.starts_with`](#stringstarts_with)
 - [`string.strip`](#stringstrip)
 - [`string.strip_newlines`](#stringstrip_newlines)
+- [`string.to_int`](#stringto_int)
+- [`string.to_long`](#stringto_long)
+- [`string.to_float`](#stringto_float)
+- [`string.to_double`](#stringto_double)
 - [`string.truncate`](#stringtruncate)
 - [`string.truncatewords`](#stringtruncatewords)
 - [`string.upcase`](#stringupcase)
@@ -1881,6 +2283,40 @@ String functions available through the builtin object 'string`.
 - [`string.sha256`](#stringsha256)
 - [`string.hmac_sha1`](#stringhmac_sha1)
 - [`string.hmac_sha256`](#stringhmac_sha256)
+- [`string.pad_left`](#stringpad_left)
+- [`string.pad_right`](#stringpad_right)
+- [`string.base64_encode`](#stringbase64_encode)
+- [`string.base64_decode`](#stringbase64_decode)
+
+[:top:](#builtins)
+### `string.escape`
+
+```
+string.escape <text>
+```
+
+#### Description
+
+Escapes a string with escape characters.
+
+#### Arguments
+
+- `text`: The input string
+
+#### Returns
+
+The two strings concatenated
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ "Hel\tlo\n\"W\\orld" | string.escape }}
+```
+> **output**
+```html
+Hel\tlo\n\"W\\orld
+```
 
 [:top:](#builtins)
 ### `string.append`
@@ -2005,6 +2441,66 @@ true
 ```
 
 [:top:](#builtins)
+### `string.empty`
+
+```
+string.empty <text>
+```
+
+#### Description
+
+Returns a boolean indicating whether the input string is an empty string.
+
+#### Arguments
+
+- `text`: The input string
+
+#### Returns
+
+ if `text` is an empty string
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ "" | string.empty }}
+```
+> **output**
+```html
+true
+```
+
+[:top:](#builtins)
+### `string.whitespace`
+
+```
+string.whitespace <text>
+```
+
+#### Description
+
+Returns a boolean indicating whether the input string is empty or contains only whitespace characters.
+
+#### Arguments
+
+- `text`: The input string
+
+#### Returns
+
+ if `text` is empty string or contains only whitespace characters
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ "" | string.whitespace }}
+```
+> **output**
+```html
+true
+```
+
+[:top:](#builtins)
 ### `string.downcase`
 
 ```
@@ -2096,6 +2592,37 @@ A url handle
 ```
 
 [:top:](#builtins)
+### `string.literal`
+
+```
+string.literal <text>
+```
+
+#### Description
+
+Return a string literal enclosed with double quotes of the input string.
+
+#### Arguments
+
+- `text`: The string to return a literal from.
+
+#### Returns
+
+The literal of a string.
+
+#### Examples
+
+If the input string has non printable characters or they need contain a double quote, they will be escaped.
+> **input**
+```scriban-html
+{{ 'Hello\n"World"' | string.literal }}
+```
+> **output**
+```html
+"Hello\n\"World\""
+```
+
+[:top:](#builtins)
 ### `string.lstrip`
 
 ```
@@ -2118,12 +2645,12 @@ The input string without any left whitespace characters
 
 > **input**
 ```scriban-html
-{{ '   too many spaces           ' | string.lstrip  }}
+{{ '   too many spaces' | string.lstrip  }}
 ```
 > Highlight to see the empty spaces to the right of the string
 > **output**
 ```html
-too many spaces           
+too many spaces
 ```
 
 [:top:](#builtins)
@@ -2135,7 +2662,7 @@ string.pluralize <number> <singular> <plural>
 
 #### Description
 
-Outputs the singular or plural version of a string based on the value of a number. 
+Outputs the singular or plural version of a string based on the value of a number.
 
 #### Arguments
 
@@ -2380,12 +2907,12 @@ The length of the input string
 ### `string.slice`
 
 ```
-string.slice <text> <start> <length: 0>?
+string.slice <text> <start> <length>?
 ```
 
 #### Description
 
-The slice returns a substring, starting at the specified index. An optional second parameter can be passed to specify the length of the substring. 
+The slice returns a substring, starting at the specified index. An optional second parameter can be passed to specify the length of the substring.
 If no second parameter is given, a substring with the remaining characters will be returned.
 
 #### Arguments
@@ -2424,7 +2951,7 @@ string.slice1 <text> <start> <length: 1>?
 
 #### Description
 
-The slice returns a substring, starting at the specified index. An optional second parameter can be passed to specify the length of the substring. 
+The slice returns a substring, starting at the specified index. An optional second parameter can be passed to specify the length of the substring.
 If no second parameter is given, a substring with the first character will be returned.
 
 #### Arguments
@@ -2463,7 +2990,7 @@ string.split <text> <match>
 
 #### Description
 
-The `split` function takes on a substring as a parameter. 
+The `split` function takes on a substring as a parameter.
 The substring is used as a delimiter to divide a string into an array. You can output different parts of an array using `array` functions.
 
 #### Arguments
@@ -2585,6 +3112,126 @@ This is a string. With another string
 ```
 
 [:top:](#builtins)
+### `string.to_int`
+
+```
+string.to_int <text>
+```
+
+#### Description
+
+Converts a string to an integer
+
+#### Arguments
+
+- `text`: The input string
+
+#### Returns
+
+A 32 bit integer or null if conversion failed
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ "123" | string.to_int + 1 }}
+```
+> **output**
+```html
+124
+```
+
+[:top:](#builtins)
+### `string.to_long`
+
+```
+string.to_long <text>
+```
+
+#### Description
+
+Converts a string to a long 64 bit integer
+
+#### Arguments
+
+- `text`: The input string
+
+#### Returns
+
+A 64 bit integer or null if conversion failed
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ "123678912345678" | string.to_long + 1 }}
+```
+> **output**
+```html
+123678912345679
+```
+
+[:top:](#builtins)
+### `string.to_float`
+
+```
+string.to_float <text>
+```
+
+#### Description
+
+Converts a string to a float
+
+#### Arguments
+
+- `text`: The input string
+
+#### Returns
+
+A 32 bit float or null if conversion failed
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ "123.4" | string.to_float + 1 }}
+```
+> **output**
+```html
+124.4
+```
+
+[:top:](#builtins)
+### `string.to_double`
+
+```
+string.to_double <text>
+```
+
+#### Description
+
+Converts a string to a double
+
+#### Arguments
+
+- `text`: The input string
+
+#### Returns
+
+A 64 bit float or null if conversion failed
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ "123.4" | string.to_double + 1 }}
+```
+> **output**
+```html
+124.4
+```
+
+[:top:](#builtins)
 ### `string.truncate`
 
 ```
@@ -2593,7 +3240,7 @@ string.truncate <text> <length> <ellipsis>?
 
 #### Description
 
-Truncates a string down to the number of characters passed as the first parameter. 
+Truncates a string down to the number of characters passed as the first parameter.
 An ellipsis (...) is appended to the truncated string and is included in the character count
 
 #### Arguments
@@ -2626,7 +3273,7 @@ string.truncatewords <text> <count> <ellipsis>?
 
 #### Description
 
-Truncates a string down to the number of words passed as the first parameter. 
+Truncates a string down to the number of words passed as the first parameter.
 An ellipsis (...) is appended to the truncated string.
 
 #### Arguments
@@ -2831,6 +3478,130 @@ The `SHA-256` hash of the input string using a hash message authentication code 
 ```html
 0329a06b62cd16b33eb6792be8c60b158d89a2ee3a876fce9a881ebb488c0914
 ```
+
+[:top:](#builtins)
+### `string.pad_left`
+
+```
+string.pad_left <text> <width>
+```
+
+#### Description
+
+Pads a string with leading spaces to a specified total length.
+
+#### Arguments
+
+- `text`: The input string
+- `width`: The number of characters in the resulting string
+
+#### Returns
+
+The input string padded
+
+#### Examples
+
+> **input**
+```scriban-html
+hello{{ "world" | string.pad_left 10 }}
+```
+> **output**
+```html
+hello     world
+```
+
+[:top:](#builtins)
+### `string.pad_right`
+
+```
+string.pad_right <text> <width>
+```
+
+#### Description
+
+Pads a string with trailing spaces to a specified total length.
+
+#### Arguments
+
+- `text`: The input string
+- `width`: The number of characters in the resulting string
+
+#### Returns
+
+The input string padded
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ "hello" | string.pad_right 10 }}world
+```
+> **output**
+```html
+hello     world
+```
+
+[:top:](#builtins)
+### `string.base64_encode`
+
+```
+string.base64_encode <text>
+```
+
+#### Description
+
+Encodes a string to its Base64 representation.
+Its character encoded will be UTF-8.
+
+#### Arguments
+
+- `text`: The string to encode
+
+#### Returns
+
+The encoded string
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ "hello" | string.base64_encode }}
+```
+> **output**
+```html
+aGVsbG8=
+```
+
+[:top:](#builtins)
+### `string.base64_decode`
+
+```
+string.base64_decode <text>
+```
+
+#### Description
+
+Decodes a Base64-encoded string to a byte array.
+he encoding of the bytes is assumed to be UTF-8.
+
+#### Arguments
+
+- `text`: The string to decode
+
+#### Returns
+
+The decoded string
+
+#### Examples
+
+> **input**
+```scriban-html
+{{ "aGVsbG8=" | string.base64_decode }}
+```
+> **output**
+```html
+hello
+```
 [:top:](#builtins)
 
 ## `timespan` functions
@@ -2839,11 +3610,11 @@ A timespan object represents a time interval.
 
 | Name             | Description
 |--------------    |-----------------
-| `.days`          | Gets the number of days of this interval 
+| `.days`          | Gets the number of days of this interval
 | `.hours`         | Gets the number of hours of this interval
 | `.minutes`       | Gets the number of minutes of this interval
 | `.seconds`       | Gets the number of seconds of this interval
-| `.milliseconds`  | Gets the number of milliseconds of this interval 
+| `.milliseconds`  | Gets the number of milliseconds of this interval
 | `.total_days`    | Gets the total number of days in fractional part
 | `.total_hours`   | Gets the total number of hours in fractional part
 | `.total_minutes` | Gets the total number of minutes in fractional part
@@ -3016,7 +3787,7 @@ timespan.parse <text>
 
 #### Description
 
-Parses the specified input string into a timespan object. 
+Parses the specified input string into a timespan object.
 
 #### Arguments
 

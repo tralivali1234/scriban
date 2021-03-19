@@ -1,13 +1,21 @@
 // Copyright (c) Alexandre Mutel. All rights reserved.
-// Licensed under the BSD-Clause 2 license. 
+// Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
+
+#nullable disable
+
 using System.Collections;
 using System.Collections.Generic;
 using Scriban.Parsing;
 
 namespace Scriban.Runtime.Accessors
 {
-    public class ListAccessor : IListAccessor, IObjectAccessor
+#if SCRIBAN_PUBLIC
+    public
+#else
+    internal
+#endif
+    class ListAccessor : IListAccessor, IObjectAccessor
     {
         public static ListAccessor Default = new ListAccessor();
 
@@ -88,7 +96,7 @@ namespace Scriban.Runtime.Accessors
             }
             if (target is IScriptObject)
             {
-                return (((IScriptObject)target)).TryGetValue(context, span, member, out value);
+                return (((IScriptObject)target)).TrySetValue(context, span, member, value, false);
             }
             return false;
         }

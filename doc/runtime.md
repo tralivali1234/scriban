@@ -13,6 +13,7 @@ The scriban runtime was designed to provide an easy, powerful and extensible inf
 
 - [Parsing a template](#parsing-a-template)
   - [Parsing modes](#parsing-modes)
+  - [Parsing languages](#parsing-languages)
   - [Liquid support](#liquid-support)
 - [Rendering a template](#rendering-a-template)
   - [Overview](#overview)
@@ -111,7 +112,32 @@ var result = template.Evaluate(new {x = 10});
 Console.WriteLine(result);
 ```
 
-> Note: As we will see in the following section about rendering, you can also avoid rendering a script only mode by evaluating the template instead of rendering. 
+[:top:](#runtime)
+### Parsing languages
+
+Scriban provides 3 languages through the `ScriptLang` enum:
+
+- `ScriptLang.Default`: which is the default Scriban Language
+- `ScriptLang.Liquid`: which is used to parse the language with liquid syntax.
+- `ScriptLang.Scientific`: which is similar to the default, but handles expression slight differently:
+  - Arguments separated by a space will convert to a multiplication: `2 x` will be evaluated as `2 * x`
+  - Except if a function is taking one argument, and in that case it resolves to a function call `cos x` resolves to `cos(x)`
+  - Otherwise function calls need to use explicit parenthesis `myfunction(1,2,3)`
+
+The language is defined by the `LexerOptions.Lang` property which.
+
+For example illustrate how to use the the `ScriptLang.Scientific` and the `ScriptOnly` mode:
+
+```c#
+// Create a template in ScriptOnly mode
+var lexerOptions = new LexerOptions() { Lang = ScriptLang.Scientific, Mode = ScriptMode.ScriptOnly };
+// Notice that code is not enclosed by `{{` and `}}`
+var template = Template.Parse("y = x + 1; 2y;", lexerOptions: lexerOptions);
+// Renders it with the specified parameter
+var result = template.Evaluate(new {x = 10});
+// Prints 22
+Console.WriteLine(result);
+```
 
 [:top:](#runtime)
 ### Liquid support
@@ -194,10 +220,10 @@ A `ScriptObject` is mainly an extended version of a `IDictionary<string, object>
   context.PushGlobal(scriptObject1);
   
   var template = Template.Parse("This is var1: `{{var1}}`");
-  template.Render(context);
+  var result = template.Render(context);
   
   // Prints: This is var1: `Variable 1`
-  Console.WriteLine(context.Output.ToString());
+  Console.WriteLine(result);
   ```
 
 Note that any `IDictionary<string, object>` put as a property will be accessible as well.
@@ -215,10 +241,10 @@ Via `ScriptObject.Import(member, Delegate)`. Here we import a `Func<string>`:
   context.PushGlobal(scriptObject1);
   
   var template = Template.Parse("This is myfunc: `{{myfunc}}`");
-  template.Render(context);
+  var result = template.Render(context);
   
   // Prints: This is myfunc: `Yes`
-  Console.WriteLine(context.Output.ToString());
+  Console.WriteLine(result);
   ```
 
 #### Imports functions from a .NET class
@@ -247,13 +273,13 @@ This function can be imported into a ScriptObject:
   context.PushGlobal(scriptObject1);
   
   var template = Template.Parse("This is MyFunctions.Hello: `{{hello}}`");
-  template.Render(context);
+  var result = template.Render(context);
   
   // Prints This is MyFunctions.Hello: `hello from method!`
-  Console.WriteLine(context.Output.ToString());
+  Console.WriteLine(result);
   ```
 
-> Notice that when using a function with pipe calls like `{{description | string.strip }}``, the last argument passed to the `string.strip` function is the result of the previous pipe.
+> Notice that when using a function with pipe calls like `{{description | string.strip }}`, the last argument passed to the `string.strip` function is the result of the previous pipe.
 > That's a reason why you will notice in all builtin functions in scriban that they usually take the most relevant parameter as a last parameter instead of the first parameter, to allow proper support for pipe calls.
 
 > **NOTICE**
@@ -292,10 +318,10 @@ Then using directly this custom `ScriptObject` as a regular object:
   context.PushGlobal(scriptObject1);
   
   var template = Template.Parse("This is MyFunctions.Hello: `{{hello}}`");
-  template.Render(context);
+  var result = template.Render(context);
   
   // Prints This is MyFunctions.Hello: `hello from method!`
-  Console.WriteLine(context.Output.ToString());
+  Console.WriteLine(result);
   ```
 
 Notice that if you want to ignore a member when importing a .NET object or .NET class, you can use the attribute `ScriptMemberIgnore`
@@ -366,7 +392,7 @@ A nested ScriptObject can be accessed indirectly through another `ScriptObject`:
   var scriptObject1 = new ScriptObject();
   var nestedObject = new ScriptObject();
   nestedObject["x"] = 5;
-  scriptObject1.Add("subObject", scriptObject1);
+  scriptObject1.Add("subObject", nestedObject);
 
   var context = new TemplateContext();
   context.PushGlobal(scriptObject1);
@@ -424,10 +450,10 @@ and import the properties/functions of this object into a ScriptObject, via `Scr
   context.PushGlobal(scriptObject1);
   
   var template = Template.Parse("This is Hello: `{{hello}}`");
-  template.Render(context);
+  var result = template.Render(context);
   
   // Prints This is MyFunctions.Hello: `hello from method!`
-  Console.WriteLine(context.Output.ToString());
+  Console.WriteLine(result);
   ```
 
 
@@ -456,10 +482,10 @@ For example, if we re-use the previous `MyObject` directly as a variable in a `S
   context.PushGlobal(scriptObject1);
   
   var template = Template.Parse("This is Hello: `{{myobject.hello}}`");
-  template.Render(context);
+  var result = template.Render(context);
   
   // Prints This is MyFunctions.Hello: `hello from method!`
-  Console.WriteLine(context.Output.ToString());
+  Console.WriteLine(result);
   ```
 
 > **NOTICE**
@@ -521,10 +547,10 @@ context.PushGlobal(scriptObject1);
 context.PushGlobal(scriptObject2);
 
 var template = Template.Parse("This is var1: `{{var1}}` and var2: `{{var2}}");
-template.Render(context);
+var result = template.Render(context);
 
 // Prints: "This is var1: `Variable 1` and var2: `Variable 2 - from ScriptObject 2"
-Console.WriteLine(context.Output.ToString());
+Console.WriteLine(result);
 ```
 
 The `TemplateContext` stack is setup like this:  `scriptObject2` => `scriptObject1` => `builtins`
@@ -538,10 +564,10 @@ When writing to a variable, only the `ScriptObject` at the top of the `TemplateC
 ```C#
 var template2 = Template.Parse("This is var1: `{{var1}}` and var2: `{{var2}}`{{var2 = 5}} and new var2: `{{var2}}");
 
-template2.Render(context);
+var result = template2.Render(context);
 
 // Prints: "This is var1: `Variable 1` and var2: `Variable 2 - from ScriptObject 2 and new var2: `5`"
-Console.WriteLine(context.Output.ToString());
+Console.WriteLine(result);
 ```
 
 The `scriptObject2` object will now contain the `var2 = 5`
@@ -621,10 +647,10 @@ Note that renaming can be changed at two levels:
   context.PushGlobal(scriptObject1);
   
   var template = Template.Parse("This is Hello: `{{Hello}}`");
-  template.Render(context);
+  var result = template.Render(context);
   
   // Prints This is MyFunctions.Hello: `hello from method!`
-  Console.WriteLine(context.Output.ToString());
+  Console.WriteLine(result);
   ```
 - By setting the default member renamer on the `TemplateContext`
 

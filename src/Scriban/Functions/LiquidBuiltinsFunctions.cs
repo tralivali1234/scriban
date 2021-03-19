@@ -1,6 +1,9 @@
 // Copyright (c) Alexandre Mutel. All rights reserved.
-// Licensed under the BSD-Clause 2 license. 
+// Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
+
+#nullable disable
+
 using System;
 using System.Collections;
 using Scriban.Parsing;
@@ -12,7 +15,12 @@ namespace Scriban.Functions
     /// <summary>
     /// Builtins functions for a Liquid TemplateContext
     /// </summary>
-    public class LiquidBuiltinsFunctions : ScriptObject
+#if SCRIBAN_PUBLIC
+    public
+#else
+    internal
+#endif
+    class LiquidBuiltinsFunctions : ScriptObject
     {
         /// <summary>
         /// This object is readonly, should not be modified by any other objects internally.
@@ -78,6 +86,8 @@ namespace Scriban.Functions
                 case "truncate": target = "string"; member = "truncate"; return true;
                 case "truncatewords": target = "string"; member = "truncatewords"; return true;
                 case "uniq": target = "array"; member = "uniq"; return true;
+                case "upcase": target = "string"; member = "upcase"; return true;
+                case "contains": target = "array"; member = "contains"; return true;
             }
 
             return false;
@@ -144,6 +154,8 @@ namespace Scriban.Functions
                 SetValue("truncate", str["truncate"], true);
                 SetValue("truncatewords", str["truncatewords"], true);
                 SetValue("uniq", array["uniq"], true);
+                SetValue("upcase", str["upcase"], true);
+                SetValue("contains", array["contains"], true);
 
                 this.Import(typeof(LiquidBuiltinsFunctions), ScriptMemberImportFlags.All);
             }

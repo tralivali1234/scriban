@@ -1,5 +1,194 @@
 # Changelog
 
+## 3.5.0 (13 Feb 2021)
+- Add EnableDisplayInnerException for ScriptRuntimeException (#329)
+- Add support for multi-line pipes
+- Fix named arguments for include
+
+## 3.4.2 (1 Feb 2021)
+- Fix evaluation when an enumeration is returned (#324) 
+- Improve returned AST when an valid part of member expression (#318)
+- Implement missing Collection interface methods for ScriptArray (#326)
+
+## 3.4.1 (23 Jan 2021)
+- Fix to ensure that attempting to render object with indexed property does not cause crash (#312)
+- Fix to ensure badly formed function declarations do not break parser
+- Fix array.each/join stopping evaluation of following statements after using a function
+- Add array.filter function (#316)
+
+## 3.4.0 (21 Jan 2021)
+- Add string.whitespace and string.empty (#307)
+- `Template.Parse` is not returning a partial AST even in case of a parser error (#308)
+- Add string.literal function
+- Add array.each function
+- Change array.join to take an optional formatting function
+
+## 3.3.3 (14 Jan 2021)
+- Fix NullReferenceException with malformed input (#293)
+- Fix include operation failing when strictVariables set (#300)
+- Fix internals of Scriban.DelegateCodeGen
+
+## 3.3.2 (30 Dec 2020)
+- Fix implicit function calls which take ScriptExpression as an argument.
+
+## 3.3.1 (30 Dec 2020)
+- Fix operator precedence issue with implicit function calls in scientific language mode.
+
+## 3.3.0 (29 Dec 2020)
+- Fix regression with include that was not propagating caller variables
+- Make TemplateContext.SetLoopVariable virtual.
+
+## 3.2.2 (24 Dec 2020)
+- Add `#nullable disable` to allow embedding Scriban as sources in a project that has enabled nullable
+
+## 3.2.1 (21 Dec 2020)
+- Fix support for Scriban package bundled with sources
+
+## 3.2.0 (21 Dec 2020)
+- Add support for Scriban package bundled with sources 
+
+## 3.1.0 (21 Dec 2020)
+- Fix issue with end of statement not followed by an EOS (#275)
+- Fix parent node span does not include all its children (#280)
+- Add object.kind method and fix TemplateContext.GetTypeName for enum
+
+## 3.0.7 (15 Dec 2020)
+- Fix unary minus operator missing in Liquid
+
+## 3.0.6 (6 Dec 2020)
+- Fix substraction in scientific mode when no whitespace was involved (e.g `1-2`) reslting in an implicit multiplication (1 * -2).
+
+## 3.0.5 (1 Dec 2020)
+- Fix indentation for nested includes when using TemplateContext.IndentWithInclude
+
+## 3.0.4 (30 Nov 2020)
+- Fix formatting/ToString of char.
+- Fix issue when using a local variable inside an object initializer.
+- Fix Template.Evaluate if used with Liquid.
+- Fix argument out of the range when using TemplateContext.IndentWithInclude.
+
+## 3.0.3 (29 Nov 2020)
+- Fix parsing of comment with a code exit when parsing mode is script only.
+
+## 3.0.2 (23 Nov 2020)
+- Fix array multiply
+
+## 3.0.1 (22 Nov 2020)
+- Fix TemplateContext.CurrentNode when current node is a value
+
+## 3.0.0 (15 Nov 2020)
+- Final release of 3.0.0
+
+## 3.0.0-alpha.9 (20 Aug 2020)
+- Fix global scope variable for function with parameters
+
+## 3.0.0-alpha.8 (7 Aug 2020)
+- Add support for custom functions with optional and variable parameters (e.g `func f(x, y = 2, z...); end;`)
+- Add support for safe dot expression (e.g `target?.member1?.sub_member1`)
+
+## 3.0.0-alpha.6 (31 Jul 2020)
+- Add support for conditional ternary expression (e.g `condition ? thenValue : elseValue`)
+
+## 3.0.0-alpha.4 (25 Jul 2020)
+- Allow to pass regular arguments to function calls in-between named arguments
+
+## 3.0.0-alpha.3 (16 Jul 2020)
+- Improve TemplateContext.GetTypeName
+- Added upcase string filter to list of built-in Liquid functions
+
+## 3.0.0-alpha.2 (6 Jul 2020)
+-  Add object.eval function.
+
+## 3.0.0-alpha.1 (18 Jun 2020)
+-  First alpha version for 3.0.0, no changelog yet.
+
+## 2.1.3 (5 Jun 2020)
+- Fix comparison != with null (#189)
+- Fix flow state after a return in a template to allow to reuse the same TemplateContext (#182)
+- Fix EnableRelaxedMemberAccess for function call (#200) 
+- Fix overrides when importing an object overriding base class methods (#227)
+
+## 2.1.2 (8 Mar 2020)
+- Case insensitive member lookup in ScriptObject
+
+## 2.1.1 (06 Dec 2019)
+- Fix issue with binary operator (a && b) that was still evaluating b even if a was already true (#191)
+
+## 2.1.0 (30 Jun 2019)
+- Allow assignments only in top level expression statements (#169)
+- Fix issue with parameter less wrap function (#177)
+- Make for variable only local to the loop (#172)
+
+## 2.0.1 (11 May 2019)
+- Fix accessing object property using indexer notation when this is a .NET object (#116)
+- Fix for appearance parser errors in ASP.NET Core developer exception page Continue to fix problem described in this PR https://github.com/lunet-io/scriban/pull/109
+- Fix issue with operator || evaluating right expression even if left is true (#166)
+
+## 2.0.0 (08 Mar 2019)
+- Fix Template.ParseLiquid throws NullReferenceException #120
+- Fix ArgumentOutOfRangeException when parsing invalid escape \u \x in strings (#121)
+- Fix InvalidCastException when an invalid conversion is occuring (#122)
+- Fix operator precedence for unary operators (#136)
+
+## 2.0.0-alpha-006 (07 Mar 2019)
+- Improve performance of for loops
+- Reduce allocations for string functions
+- Add support for rendering exceptions
+- Add base64 functions
+- Limit the supported .NET platforms to `net35`, `net40`, `net45`, `netstandard1.1`, `netstandard1.3`, `netstandard2.0`
+
+## 2.0.0-alpha-005 (15 Jan 2019)
+- Allow binary compare to work on any objects and object.Equals for non primitives (#109)
+- Fix issue with return statement not being propagated properly when used with pipe functions (#105)
+
+## 2.0.0-alpha-004 (04 Jan 2019)
+- Fix invalid handling of pipe arguments (#103)
+- Fix issue OverflowException when using a script function with a TemplateContext and object params (#104)
+
+## 2.0.0-alpha-003 (03 Jan 2019)
+- Fix issue with endraw not being parsed correctly if there is anything after (#102)
+
+## 2.0.0-alpha-002 (01 Jan 2019)
+- Fix precedence for binary operations (#100)
+
+## 2.0.0-alpha-001 (28 Dec 2018)
+- Breaking change: Add support for async/await template evaluation
+
+## 1.2.9 (21 Dec 2018)
+- Fix ret statement not returning the value when used inside a loop
+
+## 1.2.8 (17 Dec 2018)
+- Add missing datetime formatting codes (#81)
+- Add Array.Contains functionality (#76)
+- Add range operator for longs (#92)
+- Add support for relaxed indexer access (#93)
+
+## 1.2.7 (6 Oct 2018)
+- Fix numeric literals not being parsed with the invariant culture (#74)
+- Fix string to number conversion functions to use the context culture (#78)
+
+## 1.2.6 (26 Sep 2018)
+- Fix a an exception when using a decimal in a binary operation (#72)
+
+## 1.2.5 (29 Aug 2018)
+- Fix a bug with `netstandard2.0` throwing a `NullReferenceException` when using internally reflection
+
+## 1.2.4 (21 Aug 2018)
+- Add support for passing culture info directly to `math.format` and `object.format` (#68)
+- Add support for netstandard2.0
+- Add support for github sourcelink debugging
+
+## 1.2.3 (20 July 2018)
+- Add support for passing `MemberFilterDelegate` directly to `Template.Render` and `Template.Evaluate` (#64)
+
+## 1.2.2 (3 July 2018)
+
+- Fix `date.now` that was actually caching the value on initialization (#60)
+
+## 1.2.1 (1 June 2018)
+
+- Add `string.to_int` `string.to_long` `string.to_float` `string.to_double`. (#55)
+
 ## 1.2.0 (10 Feb 2018)
 
 - Remove support for importing method instance as this is confusing and actually not supported. Update the documentation. (#44)

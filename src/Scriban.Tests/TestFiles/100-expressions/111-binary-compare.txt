@@ -34,6 +34,8 @@
 1.5 < 2 && 3 < 5 = {{ 1.5 < 2 && 3 < 5 }}
 
 true || false = {{true || false}}
+false || true = {{false || true}}
+false && true = {{ false && true }}
 true && true && false = {{true && true && false}}
 true && true && false || true = {{true && true && false || true}}
 true && true && false || true && true = {{true && true && false || true && true}}
@@ -47,3 +49,17 @@ a == empty: {{
     a == empty
 }}
 b == empty: {{b == empty}}
+c = a
+a == c: {{
+    c = a
+    a == c
+}}
+
+a = {}
+if !a.foo || a.foo.bar
+    "empty ok"
+end
+{{ if !a.foo || a.foo.bar
+    "empty ok"
+   end
+}}

@@ -1,13 +1,20 @@
 // Copyright (c) Alexandre Mutel. All rights reserved.
-// Licensed under the BSD-Clause 2 license. 
+// Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
+
+#nullable disable
 
 using System.Collections.Generic;
 using Scriban.Parsing;
 
 namespace Scriban.Runtime.Accessors
 {
-    public class NullAccessor : IObjectAccessor
+#if SCRIBAN_PUBLIC
+    public
+#else
+    internal
+#endif
+    class NullAccessor : IObjectAccessor
     {
         public static readonly NullAccessor Default = new NullAccessor();
 
@@ -31,7 +38,7 @@ namespace Scriban.Runtime.Accessors
             value = null;
             return false;
         }
-       
+
         public bool TrySetValue(TemplateContext context, SourceSpan span, object target, string member, object value)
         {
             return false;

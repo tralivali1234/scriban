@@ -1,10 +1,14 @@
 // Copyright (c) Alexandre Mutel. All rights reserved.
-// Licensed under the BSD-Clause 2 license. 
+// Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
+
+#nullable disable
 
 using System;
 using System.Collections;
+using System.Globalization;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using Scriban.Runtime;
@@ -15,8 +19,99 @@ namespace Scriban.Functions
     /// <summary>
     /// String functions available through the builtin object 'string`.
     /// </summary>
-    public class StringFunctions : ScriptObject
+#if SCRIBAN_PUBLIC
+    public
+#else
+    internal
+#endif
+    class StringFunctions : ScriptObject
     {
+        [ThreadStatic] private static StringBuilder _tlsBuilder;
+
+        private static StringBuilder GetTempStringBuilder()
+        {
+            var builder = _tlsBuilder;
+            if (builder == null) builder = _tlsBuilder = new StringBuilder(1024);
+            return builder;
+        }
+
+        private static void ReleaseBuilder(StringBuilder builder) => builder.Length = 0;
+
+        /// <summary>
+        /// Escapes a string with escape characters.
+        /// </summary>
+        /// <param name="text">The input string</param>
+        /// <returns>The two strings concatenated</returns>
+        /// <remarks>
+        /// ```scriban-html
+        /// {{ "Hel\tlo\n\"W\\orld" | string.escape }}
+        /// ```
+        /// ```html
+        /// Hel\tlo\n\"W\\orld
+        /// ```
+        /// </remarks>
+        public static string Escape(string text)
+        {
+            if (text == null) return text;
+            StringBuilder builder = null;
+            for (int i = 0; i < text.Length; i++)
+            {
+                var c = text[i];
+                if (c < 32 || c == '"' || c == '\\')
+                {
+                    string appendText;
+                    switch (c)
+                    {
+                        case '"':
+                            appendText = "\\\"";
+                            break;
+                        case '\\':
+                            appendText = "\\\\";
+                            break;
+                        case '\a':
+                            appendText = "\\a";
+                            break;
+                        case '\b':
+                            appendText = "\\b";
+                            break;
+                        case '\t':
+                            appendText = "\\t";
+                            break;
+                        case '\r':
+                            appendText = "\\r";
+                            break;
+                        case '\v':
+                            appendText = "\\v";
+                            break;
+                        case '\f':
+                            appendText = "\\f";
+                            break;
+                        case '\n':
+                            appendText = "\\n";
+                            break;
+                        default:
+                            appendText = $"\\x{(int)c:x2}";
+                            break;
+                    }
+
+                    if (builder == null)
+                    {
+                        builder = new StringBuilder(text.Length + 10);
+                        if (i > 0) builder.Append(text, 0, i);
+                    }
+
+                    builder.Append(appendText);
+                }
+                else if (builder != null)
+                {
+                    // TODO: could be more optimized by adding range
+                    builder.Append(c);
+                }
+            }
+
+            return builder != null ? builder.ToString() : text;
+        }
+
         /// <summary>
         /// Concatenates two strings
         /// </summary>
@@ -56,9 +151,15 @@ namespace Scriban.Functions
                 return text ?? string.Empty;
             }
 
-            var builder = new StringBuilder(text);
-            builder[0] = char.ToUpper(builder[0]);
-            return builder.ToString();
+            var builder = GetTempStringBuilder();
+            builder.Append(char.ToUpper(text[0]));
+            if (text.Length > 1)
+            {
+                builder.Append(text, 1, text.Length - 1);
+            }
+            var result = builder.ToString();
+            ReleaseBuilder(builder);
+            return result;
         }
 
         /// <summary>
@@ -81,7 +182,7 @@ namespace Scriban.Functions
                 return string.Empty;
             }
 
-            var builder = new StringBuilder(text.Length);
+            var builder = GetTempStringBuilder();
             var previousSpace = true;
             for (int i = 0; i < text.Length; i++)
             {
@@ -98,7 +199,9 @@ namespace Scriban.Functions
                 }
                 builder.Append(c);
             }
-            return builder.ToString();
+            var result = builder.ToString();
+            ReleaseBuilder(builder);
+            return result;
         }
 
         /// <summary>
@@ -122,6 +225,42 @@ namespace Scriban.Functions
                 return false;
             }
             return text.Contains(value);
+        }
+
+        /// <summary>
+        /// Returns a boolean indicating whether the input string is an empty string.
+        /// </summary>
+        /// <param name="text">The input string</param>
+        /// <returns><c>true</c> if `text` is an empty string</returns>
+        /// <remarks>
+        /// ```scriban-html
+        /// {{ "" | string.empty }}
+        /// ```
+        /// ```html
+        /// true
+        /// ```
+        /// </remarks>
+        public static bool Empty(string text)
+        {
+            return string.IsNullOrEmpty(text);
+        }
+
+        /// <summary>
+        /// Returns a boolean indicating whether the input string is empty or contains only whitespace characters.
+        /// </summary>
+        /// <param name="text">The input string</param>
+        /// <returns><c>true</c> if `text` is empty string or contains only whitespace characters</returns>
+        /// <remarks>
+        /// ```scriban-html
+        /// {{ "" | string.whitespace }}
+        /// ```
+        /// ```html
+        /// true
+        /// ```
+        /// </remarks>
+        public static bool Whitespace(string text)
+        {
+            return string.IsNullOrWhiteSpace(text);
         }
 
         /// <summary>
@@ -181,7 +320,7 @@ namespace Scriban.Functions
         /// </remarks>
         public static string Handleize(string text)
         {
-            var builder = new StringBuilder();
+            var builder = GetTempStringBuilder();
             char lastChar = (char) 0;
             for (int i = 0; i < text.Length; i++)
             {
@@ -201,7 +340,28 @@ namespace Scriban.Functions
             {
                 builder.Length--;
             }
-            return builder.ToString();
+            var result = builder.ToString();
+            ReleaseBuilder(builder);
+            return result;
+        }
+        
+        /// <summary>
+        /// Return a string literal enclosed with double quotes of the input string.
+        /// </summary>
+        /// <param name="text">The string to return a literal from.</param>
+        /// <returns>The literal of a string.</returns>
+        /// <remarks>
+        /// If the input string has non printable characters or they need contain a double quote, they will be escaped.
+        /// ```scriban-html
+        /// {{ 'Hello\n"World"' | string.literal }}
+        /// ```
+        /// ```html
+        /// "Hello\n\"World\""
+        /// ```
+        /// </remarks>
+        public static string Literal(string text)
+        {
+            return text == null ? null : $"\"{Escape(text)}\"";
         }
 
         /// <summary>
@@ -211,11 +371,11 @@ namespace Scriban.Functions
         /// <returns>The input string without any left whitespace characters</returns>
         /// <remarks>
         /// ```scriban-html
-        /// {{ '   too many spaces           ' | string.lstrip  }}
+        /// {{ '   too many spaces' | string.lstrip  }}
         /// ```
         /// > Highlight to see the empty spaces to the right of the string
         /// ```html
-        /// too many spaces           
+        /// too many spaces
         /// ```
         /// </remarks>
         public static string LStrip(string text)
@@ -224,7 +384,7 @@ namespace Scriban.Functions
         }
 
         /// <summary>
-        /// Outputs the singular or plural version of a string based on the value of a number. 
+        /// Outputs the singular or plural version of a string based on the value of a number.
         /// </summary>
         /// <param name="number">The number to check</param>
         /// <param name="singular">The singular string to return if number is == 1</param>
@@ -366,12 +526,14 @@ namespace Scriban.Functions
                 return text;
             }
 
-            var builder = new StringBuilder();
+            var builder = GetTempStringBuilder();
             builder.Append(text.Substring(0, indexOfMatch));
             builder.Append(replace);
             builder.Append(text.Substring(indexOfMatch + match.Length));
 
-            return builder.ToString();
+            var result = builder.ToString();
+            ReleaseBuilder(builder);
+            return result;
         }
 
         /// <summary>
@@ -412,7 +574,7 @@ namespace Scriban.Functions
         }
 
         /// <summary>
-        /// The slice returns a substring, starting at the specified index. An optional second parameter can be passed to specify the length of the substring. 
+        /// The slice returns a substring, starting at the specified index. An optional second parameter can be passed to specify the length of the substring.
         /// If no second parameter is given, a substring with the remaining characters will be returned.
         /// </summary>
         /// <param name="text">The input string</param>
@@ -433,7 +595,7 @@ namespace Scriban.Functions
         /// ell
         /// ```
         /// </remarks>
-        public static string Slice(string text, int start, int length = 0)
+        public static string Slice(string text, int start, int? length = null)
         {
             if (string.IsNullOrEmpty(text) || start >= text.Length)
             {
@@ -445,7 +607,7 @@ namespace Scriban.Functions
                 start = start + text.Length;
             }
 
-            if (length <= 0)
+            if (!length.HasValue)
             {
                 length = text.Length;
             }
@@ -465,11 +627,11 @@ namespace Scriban.Functions
                 length = text.Length - start;
             }
 
-            return text.Substring(start, length);
+            return text.Substring(start, length.Value);
         }
 
         /// <summary>
-        /// The slice returns a substring, starting at the specified index. An optional second parameter can be passed to specify the length of the substring. 
+        /// The slice returns a substring, starting at the specified index. An optional second parameter can be passed to specify the length of the substring.
         /// If no second parameter is given, a substring with the first character will be returned.
         /// </summary>
         /// <param name="text">The input string</param>
@@ -517,7 +679,7 @@ namespace Scriban.Functions
         }
 
         /// <summary>
-        /// The `split` function takes on a substring as a parameter. 
+        /// The `split` function takes on a substring as a parameter.
         /// The substring is used as a delimiter to divide a string into an array. You can output different parts of an array using `array` functions.
         /// </summary>
         /// <param name="text">The input string</param>
@@ -541,12 +703,10 @@ namespace Scriban.Functions
         {
             if (string.IsNullOrEmpty(text))
             {
-                return Enumerable.Empty<string>();
+                return new ScriptRange(Enumerable.Empty<string>());
             }
 
-            match = match ?? string.Empty;
-
-            return text.Split(new[] {match}, StringSplitOptions.RemoveEmptyEntries);
+            return new ScriptRange(text.Split(new[] {match}, StringSplitOptions.RemoveEmptyEntries));
         }
 
         /// <summary>
@@ -616,7 +776,83 @@ namespace Scriban.Functions
         }
 
         /// <summary>
-        /// Truncates a string down to the number of characters passed as the first parameter. 
+        /// Converts a string to an integer
+        /// </summary>
+        /// <param name="context">The template context</param>
+        /// <param name="text">The input string</param>
+        /// <returns>A 32 bit integer or null if conversion failed</returns>
+        /// <remarks>
+        /// ```scriban-html
+        /// {{ "123" | string.to_int + 1 }}
+        /// ```
+        /// ```html
+        /// 124
+        /// ```
+        /// </remarks>
+        public static object ToInt(TemplateContext context, string text)
+        {
+            return int.TryParse(text, NumberStyles.Integer, context.CurrentCulture, out int result) ? (object) result : null;
+        }
+
+        /// <summary>
+        /// Converts a string to a long 64 bit integer
+        /// </summary>
+        /// <param name="context">The template context</param>
+        /// <param name="text">The input string</param>
+        /// <returns>A 64 bit integer or null if conversion failed</returns>
+        /// <remarks>
+        /// ```scriban-html
+        /// {{ "123678912345678" | string.to_long + 1 }}
+        /// ```
+        /// ```html
+        /// 123678912345679
+        /// ```
+        /// </remarks>
+        public static object ToLong(TemplateContext context, string text)
+        {
+            return long.TryParse(text, NumberStyles.Integer, context.CurrentCulture, out long result) ? (object)result : null;
+        }
+
+        /// <summary>
+        /// Converts a string to a float
+        /// </summary>
+        /// <param name="context">The template context</param>
+        /// <param name="text">The input string</param>
+        /// <returns>A 32 bit float or null if conversion failed</returns>
+        /// <remarks>
+        /// ```scriban-html
+        /// {{ "123.4" | string.to_float + 1 }}
+        /// ```
+        /// ```html
+        /// 124.4
+        /// ```
+        /// </remarks>
+        public static object ToFloat(TemplateContext context, string text)
+        {
+            return float.TryParse(text, NumberStyles.Float | NumberStyles.AllowThousands, context.CurrentCulture, out float result) ? (object)result : null;
+        }
+
+        /// <summary>
+        /// Converts a string to a double
+        /// </summary>
+        /// <param name="context">The template context</param>
+        /// <param name="text">The input string</param>
+        /// <returns>A 64 bit float or null if conversion failed</returns>
+        /// <remarks>
+        /// ```scriban-html
+        /// {{ "123.4" | string.to_double + 1 }}
+        /// ```
+        /// ```html
+        /// 124.4
+        /// ```
+        /// </remarks>
+        public static object ToDouble(TemplateContext context, string text)
+        {
+            return double.TryParse(text, NumberStyles.Float | NumberStyles.AllowThousands, context.CurrentCulture, out double result) ? (object)result : null;
+        }
+
+        /// <summary>
+        /// Truncates a string down to the number of characters passed as the first parameter.
         /// An ellipsis (...) is appended to the truncated string and is included in the character count
         /// </summary>
         /// <param name="text">The input string</param>
@@ -641,16 +877,17 @@ namespace Scriban.Functions
             int lMinusTruncate = length - ellipsis.Length;
             if (text.Length > length)
             {
-                var builder = new StringBuilder(length);
+                var builder = GetTempStringBuilder();
                 builder.Append(text, 0, lMinusTruncate < 0 ? 0 : lMinusTruncate);
                 builder.Append(ellipsis);
-                return builder.ToString();
+                text = builder.ToString();
+                ReleaseBuilder(builder);
             }
             return text;
         }
 
         /// <summary>
-        /// Truncates a string down to the number of words passed as the first parameter. 
+        /// Truncates a string down to the number of words passed as the first parameter.
         /// An ellipsis (...) is appended to the truncated string.
         /// </summary>
         /// <param name="text">The input string</param>
@@ -672,7 +909,7 @@ namespace Scriban.Functions
                 return string.Empty;
             }
 
-            var builder = new StringBuilder();
+            var builder = GetTempStringBuilder();
             bool isFirstWord = true;
             foreach (var word in Regex.Split(text, @"\s+"))
             {
@@ -692,7 +929,9 @@ namespace Scriban.Functions
                 count--;
             }
             builder.Append("...");
-            return builder.ToString();
+            var result = builder.ToString();
+            ReleaseBuilder(builder);
+            return result;
         }
 
         /// <summary>
@@ -713,7 +952,6 @@ namespace Scriban.Functions
             return text?.ToUpperInvariant();
         }
 
-#if !PCL328 && !NETSTD11
         /// <summary>
         /// Computes the `md5` hash of the input string
         /// </summary>
@@ -827,39 +1065,92 @@ namespace Scriban.Functions
             text = text ?? string.Empty;
             var bytes = Encoding.UTF8.GetBytes(text);
             var hash = algo.ComputeHash(bytes);
-            var sb = new StringBuilder(hash.Length * 2);
+            var sb = GetTempStringBuilder();
             for (var i = 0; i < hash.Length; i++)
             {
                 var b = hash[i];
                 sb.Append(b.ToString("x2"));
             }
-            return sb.ToString();
-        }
-#else
-        public static string Md5(string text)
-        {
-            throw new NotSupportedException("`string.md5` is not supported on this .NET platform");
+            var result = sb.ToString();
+            ReleaseBuilder(sb);
+            return result;
         }
 
-        public static string Sha1(string text)
+        /// <summary>
+        /// Pads a string with leading spaces to a specified total length.
+        /// </summary>
+        /// <param name="text">The input string</param>
+        /// <param name="width">The number of characters in the resulting string</param>
+        /// <returns>The input string padded</returns>
+        /// <remarks>
+        /// ```scriban-html
+        /// hello{{ "world" | string.pad_left 10 }}
+        /// ```
+        /// ```html
+        /// hello     world
+        /// ```
+        /// </remarks>
+        public static string PadLeft(string text, int width)
         {
-            throw new NotSupportedException("`string.sha1` is not supported on this .NET platform");
+            return (text ?? string.Empty).PadLeft(width);
         }
 
-        public static string Sha256(string text)
+        /// <summary>
+        /// Pads a string with trailing spaces to a specified total length.
+        /// </summary>
+        /// <param name="text">The input string</param>
+        /// <param name="width">The number of characters in the resulting string</param>
+        /// <returns>The input string padded</returns>
+        /// <remarks>
+        /// ```scriban-html
+        /// {{ "hello" | string.pad_right 10 }}world
+        /// ```
+        /// ```html
+        /// hello     world
+        /// ```
+        /// </remarks>
+        public static string PadRight(string text, int width)
         {
-            throw new NotSupportedException("`string.sha256` is not supported on this .NET platform");
+            return (text ?? string.Empty).PadRight(width);
         }
 
-        public static string HmacSha1(string text, string secretKey)
+        /// <summary>
+        /// Encodes a string to its Base64 representation.
+        /// Its character encoded will be UTF-8.
+        /// </summary>
+        /// <param name="text">The string to encode</param>
+        /// <returns>The encoded string</returns>
+        /// <remarks>
+        /// ```scriban-html
+        /// {{ "hello" | string.base64_encode }}
+        /// ```
+        /// ```html
+        /// aGVsbG8=
+        /// ```
+        /// </remarks>
+        public static string Base64Encode(string text)
         {
-            throw new NotSupportedException("`string.hmac_sha1` is not supported on this .NET platform");
+            return Convert.ToBase64String(Encoding.UTF8.GetBytes(text ?? string.Empty));
         }
 
-        public static string HmacSha256(string text, string secretKey)
+        /// <summary>
+        ///  Decodes a Base64-encoded string to a byte array.
+        /// The encoding of the bytes is assumed to be UTF-8.
+        /// </summary>
+        /// <param name="text">The string to decode</param>
+        /// <returns>The decoded string</returns>
+        /// <remarks>
+        /// ```scriban-html
+        /// {{ "aGVsbG8=" | string.base64_decode }}
+        /// ```
+        /// ```html
+        /// hello
+        /// ```
+        /// </remarks>
+        public static string Base64Decode(string text)
         {
-            throw new NotSupportedException("`string.hmac_sha256` is not supported on this .NET platform");
+            var decoded = Convert.FromBase64String(text ?? string.Empty);
+            return Encoding.UTF8.GetString(decoded);
         }
-#endif
     }
 }

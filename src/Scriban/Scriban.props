@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Description>Scriban is a fast, powerful, safe and lightweight scripting language and engine for .NET, which was primarily developed for text templating with a compatibility mode for parsing liquid templates.</Description>
+    <Copyright>Alexandre Mutel</Copyright>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <VersionPrefix>3.5.0</VersionPrefix>
+    <LangVersion>8.0</LangVersion>
+    <DefineConstants>$(DefineConstants);SCRIBAN_PUBLIC</DefineConstants>
+    <!--<VersionSuffix>alpha</VersionSuffix>
+    <BuildNumber>9</BuildNumber>
+    <VersionSuffix Condition="'$(VersionSuffix)' != '' AND '$(BuildNumber)' != ''">$(VersionSuffix).$(BuildNumber)</VersionSuffix>-->
+    <Authors>Alexandre Mutel</Authors>
+    <TargetFrameworks>netstandard2.0;net5.0</TargetFrameworks>
+    <PackageTags>templating;handlebars;liquid</PackageTags>
+    <PackageReleaseNotes>https://github.com/lunet-io/scriban/blob/master/changelog.md</PackageReleaseNotes>
+    <PackageIcon>scriban.png</PackageIcon>
+    <PackageProjectUrl>https://github.com/lunet-io/scriban</PackageProjectUrl>
+    <PackageLicenseExpression>BSD-2-Clause</PackageLicenseExpression>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- This is enabled but still not used in scriban, only setup to protect embedding source to produce new warnings if the user project is using nullable -->
+    <Nullable>enable</Nullable>
+    <!--Add support for sourcelink-->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Pack sources in the nuget packages -->
+    <None Remove="Package\Scriban.*"/>
+    <Content Include="Package\Scriban.*">
+      <Pack>true</Pack>
+      <PackagePath>build\</PackagePath>
+      <PackageCopyToOutput>true</PackageCopyToOutput>
+    </Content>
+    <Content Include="**\*.cs" Exclude="**\obj\**;**\bin\**" Visible="false">
+      <Pack>true</Pack>
+      <PackagePath>src\Scriban\</PackagePath>
+      <PackageCopyToOutput>true</PackageCopyToOutput>
+    </Content>
+
+    <None Include="../../img/scriban.png" Pack="true" PackagePath="" />
+    <!-- git versioning -->
+    <PackageReference Include="MSBuildGitHash" Version="2.0.2" PrivateAssets="All" />
+    <!--Add support for sourcelink-->
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.*" PrivateAssets="All" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFrameworkIdentifier)' == '.NETStandard'">
+    <PackageReference Include="Microsoft.CSharp" Version="4.5.0" />
+    <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.0" />
+  </ItemGroup>
+</Project>

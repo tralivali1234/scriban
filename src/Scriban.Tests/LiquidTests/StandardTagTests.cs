@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Runtime.Remoting.Contexts;
 using NUnit.Framework;
 using Scriban;
 
@@ -76,7 +74,7 @@ namespace DotLiquid.Tests.Tags
         public void TestForWithNestedDictionary()
         {
             var dictionary = new Dictionary<string, object> { {
-            "People", 
+            "People",
             new Dictionary<string, object> {
                     { "ID1", new Dictionary<string, object>{ { "First", "Jane" }, { "Last", "Green" } } },
                     { "ID2", new Dictionary<string, object>{ { "First", "Mike" }, { "Last", "Doe" } } }
@@ -138,8 +136,8 @@ namespace DotLiquid.Tests.Tags
             Helper.AssertTemplateResult(" 1/3  2/3  3/3 ",
                 "{%for item in values%} {{forloop.index}}/{{forloop.length}} {%endfor%}", assigns);
             Helper.AssertTemplateResult(" 1  2  3 ", "{%for item in values%} {{forloop.index}} {%endfor%}", assigns);
-            Helper.AssertTemplateResult(" 0  1  2 ", "{%for item in values%} {{forloop.index0}} {%endfor%}", assigns);
-            Helper.AssertTemplateResult(" 2  1  0 ", "{%for item in values%} {{forloop.rindex0}} {%endfor%}", assigns);
+            Helper.AssertTemplateResult(" 0  1  2 ", "{%for item in values%} {{forloop.index0}} {%endfor%}", assigns, hasForVariableNotSupportedByScriban: true);
+            Helper.AssertTemplateResult(" 2  1  0 ", "{%for item in values%} {{forloop.rindex0}} {%endfor%}", assigns, hasForVariableNotSupportedByScriban: true);
             Helper.AssertTemplateResult(" 3  2  1 ", "{%for item in values%} {{forloop.rindex}} {%endfor%}", assigns);
             Helper.AssertTemplateResult(" true  false  false ", "{%for item in values%} {{forloop.first}} {%endfor%}", assigns);
             Helper.AssertTemplateResult(" false  false  true ", "{%for item in values%} {{forloop.last}} {%endfor%}", assigns);
@@ -199,7 +197,7 @@ namespace DotLiquid.Tests.Tags
                 456
                 next
                 789";
-            Helper.AssertTemplateResult(expected, markup, assigns);
+            Helper.AssertTemplateResult(expected, markup, assigns, supportRoundTrip: false);
         }
 
         [Test]
@@ -216,7 +214,7 @@ namespace DotLiquid.Tests.Tags
                 456
                 next
                 7";
-            Helper.AssertTemplateResult(expected, markup, assigns);
+            Helper.AssertTemplateResult(expected, markup, assigns, supportRoundTrip: false);
         }
 
         [Test]
@@ -235,7 +233,7 @@ namespace DotLiquid.Tests.Tags
                 456
                 next
                 7890";
-            Helper.AssertTemplateResult(expected, markup, assigns);
+            Helper.AssertTemplateResult(expected, markup, assigns, supportRoundTrip: false);
         }
 
         [Test]
@@ -254,7 +252,7 @@ namespace DotLiquid.Tests.Tags
                 456
                 next
                 ";
-            Helper.AssertTemplateResult(expected, markup, assigns);
+            Helper.AssertTemplateResult(expected, markup, assigns, supportRoundTrip: false);
         }
 
         [Test]
@@ -297,6 +295,14 @@ namespace DotLiquid.Tests.Tags
             Hash assigns = Hash.FromAnonymousObject(new { var = "content" });
             Helper.AssertTemplateResult("var2:  var2:content", "var2:{{var2}} {%assign var2 = var%} var2:{{var2}}", assigns);
         }
+
+        [Test]
+        public void TestAssignMinus()
+        {
+            Hash assigns = Hash.FromAnonymousObject(new { notused = "content" });
+            Helper.AssertTemplateResult("var2:  var2:-1", "var2:{{var2}} {% assign var2 = -1 %} var2:{{var2}}", assigns);
+        }
+        
 
         [Test]
         public void TestHyphenatedAssign()

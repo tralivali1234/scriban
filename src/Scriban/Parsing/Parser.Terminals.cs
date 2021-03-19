@@ -1,16 +1,26 @@
 // Copyright (c) Alexandre Mutel. All rights reserved.
-// Licensed under the BSD-Clause 2 license. 
+// Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
+
+#nullable disable
 
 using System;
 using System.Collections.Generic;
+using System.Data;
+using System.Globalization;
+using System.Numerics;
 using System.Text;
 using Scriban.Runtime;
 using Scriban.Syntax;
 
 namespace Scriban.Parsing
 {
-    public partial class Parser
+#if SCRIBAN_PUBLIC
+    public
+#else
+    internal
+#endif
+    partial class Parser
     {
         private ScriptExpression ParseVariableOrLiteral()
         {
@@ -23,6 +33,12 @@ namespace Scriban.Parsing
                     break;
                 case TokenType.Integer:
                     literal = ParseInteger();
+                    break;
+                case TokenType.HexaInteger:
+                    literal = ParseHexaInteger();
+                    break;
+                case TokenType.BinaryInteger:
+                    literal = ParseBinaryInteger();
                     break;
                 case TokenType.Float:
                     literal = ParseFloat();
@@ -48,14 +64,39 @@ namespace Scriban.Parsing
             var literal = Open<ScriptLiteral>();
 
             var text = GetAsText(Current);
-            double floatResult;
-            if (double.TryParse(text, out floatResult))
+            var c = text[text.Length - 1];
+            if (c == 'f' || c == 'F')
             {
-                literal.Value = floatResult;
+                float floatResult;
+                if (float.TryParse(text.Substring(0, text.Length - 1), NumberStyles.Float, CultureInfo.InvariantCulture, out floatResult))
+                {
+                    literal.Value = floatResult;
+                }
+                else
+                {
+                    LogError($"Unable to parse float value `{text}`");
+                }
             }
             else
             {
-                LogError($"Unable to parse double value `{text}`");
+                var explicitDecimal = c == 'm' || c == 'M';
+                if ((Options.ParseFloatAsDecimal || explicitDecimal) && decimal.TryParse(explicitDecimal ? text.Substring(0, text.Length - 1) : text, NumberStyles.Float, CultureInfo.InvariantCulture, out var decimalResult))
+                {
+                    literal.Value = decimalResult;
+                }
+                else
+                {
+                    double floatResult;
+                    if (double.TryParse(c == 'd' || c == 'D' ? text.Substring(0, text.Length-1) : text, NumberStyles.Float, CultureInfo.InvariantCulture, out floatResult))
+                    {
+                        literal.Value = floatResult;
+                    }
+                }
+
+                if (literal.Value == null)
+                {
+                    LogError($"Unable to parse double value `{text}`");
+                }
             }
 
             NextToken(); // Skip the float
@@ -75,20 +116,184 @@ namespace Scriban.Parsing
         {
             var literal = Open<ScriptLiteral>();
 
-            var text = GetAsText(Current);
+            var text = GetAsText(Current).Replace("_", string.Empty);
             long result;
-            if (!long.TryParse(text, out result))
+            if (!long.TryParse(text, NumberStyles.Integer|NumberStyles.AllowExponent, CultureInfo.InvariantCulture, out result))
             {
-                LogError($"Unable to parse the integer {text}");
-            }
+                bool isValid = false;
 
-            if (result >= int.MinValue && result <= int.MaxValue)
-            {
-                literal.Value = (int) result;
+                if (BigInteger.TryParse(text, NumberStyles.Integer | NumberStyles.AllowExponent, CultureInfo.InvariantCulture, out var bigResult))
+                {
+                    literal.Value = bigResult;
+                    isValid = true;
+                }
+                if (!isValid)
+                {
+                    LogError($"Unable to parse the integer {text}");
+                }
             }
             else
             {
-                literal.Value = result;
+
+                if (result >= int.MinValue && result <= int.MaxValue)
+                {
+                    literal.Value = (int) result;
+                }
+                else
+                {
+                    literal.Value = result;
+                }
+            }
+
+            NextToken(); // Skip the literal
+            return Close(literal);
+        }
+
+        private ScriptLiteral ParseHexaInteger()
+        {
+            var literal = Open<ScriptLiteral>();
+
+            var text = GetAsText(Current).Substring(2).Replace("_", string.Empty);
+            bool isUnsigned = false;
+            if (text.EndsWith("u", StringComparison.OrdinalIgnoreCase))
+            {
+                text = text.Substring(0, text.Length - 1);
+                isUnsigned = true;
+            }
+            ulong tempResult;
+
+            if (!ulong.TryParse(text, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out tempResult))
+            {
+                bool isValid = false;
+
+                if (BigInteger.TryParse(text, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var bigResult))
+                {
+                    literal.Value = bigResult;
+                    isValid = true;
+                }
+
+                if (!isValid)
+                {
+                    LogError($"Unable to parse the integer {text}");
+                }
+            }
+            else
+            {
+                if (tempResult <= uint.MaxValue)
+                {
+                    if (isUnsigned)
+                    {
+                        literal.Value = (long)(uint)tempResult;
+                    }
+                    else
+                    {
+                        literal.Value = unchecked((int)(uint)tempResult);
+                    }
+                }
+                else
+                {
+                    if (isUnsigned)
+                    {
+                        literal.Value = new BigInteger(tempResult);
+                    }
+
+                    if (literal.Value == null)
+                    {
+                        literal.Value = unchecked((long)tempResult);
+                    }
+                }
+            }
+
+            NextToken(); // Skip the literal
+            return Close(literal);
+        }
+
+        private ScriptLiteral ParseBinaryInteger()
+        {
+            var literal = Open<ScriptLiteral>();
+
+            var text = GetAsText(Current).Replace("_", string.Empty);
+            bool isUnsigned = false;
+            if (text.EndsWith("u", StringComparison.OrdinalIgnoreCase))
+            {
+                text = text.Substring(0, text.Length - 1);
+                isUnsigned = true;
+            }
+
+            var dotIndex = text.IndexOf('.');
+            var isDoubleOrFloat = dotIndex > 2;
+
+            if (isDoubleOrFloat)
+            {
+                bool isFloat = false;
+                if (text.EndsWith("f", StringComparison.OrdinalIgnoreCase))
+                {
+                    text = text.Substring(0, text.Length - 1);
+                    isFloat = true;
+                }
+                else if (text.EndsWith("d", StringComparison.OrdinalIgnoreCase))
+                {
+                    text = text.Substring(0, text.Length - 1);
+                }
+
+                int exponent = dotIndex - 2;
+                var number = BigInteger.Zero;
+                int digit = 0;
+                for (int i = 2; i < text.Length; i++)
+                {
+                    var c = text[i];
+                    if (c == '.') continue;
+                    number <<= 1;
+                    number |= c == '0' ? 0U : 1U;
+                    digit++;
+                }
+
+                if (isFloat)
+                {
+                    literal.Value = (float)number * (float)Math.Pow(2, exponent - digit);
+                }
+                else
+                {
+                    literal.Value = (double)number * Math.Pow(2, exponent - digit);
+                }
+            }
+            else
+            {
+                var number = BigInteger.Zero;
+                for (int i = 2; i < text.Length; i++)
+                {
+                    var c = text[i];
+                    number <<= 1;
+                    number |= c == '0' ? 0U : 1U;
+                }
+
+                if (number <= uint.MaxValue)
+                {
+                    if (isUnsigned)
+                    {
+                        literal.Value = (long) (uint) number;
+                    }
+                    else
+                    {
+                        literal.Value = unchecked((int) (uint) number);
+                    }
+                }
+                else if (number <= ulong.MaxValue)
+                {
+                    if (isUnsigned)
+                    {
+                        literal.Value = number;
+                    }
+
+                    if (literal.Value == null)
+                    {
+                        literal.Value = unchecked((long) (ulong) number);
+                    }
+                }
+                else
+                {
+                    literal.Value = number;
+                }
             }
 
             NextToken(); // Skip the literal
@@ -154,10 +359,12 @@ namespace Scriban.Parsing
                         case 'u':
                         {
                             i++;
-                            var value = (text[i++].HexToInt() << 12) +
-                                        (text[i++].HexToInt() << 8) +
-                                        (text[i++].HexToInt() << 4) +
-                                        text[i].HexToInt();
+                            int value = 0;
+                            if (i < text.Length) value = text[i++].HexToInt();
+                            if (i < text.Length) value = (value << 4) | text[i++].HexToInt();
+                            if (i < text.Length) value = (value << 4) | text[i++].HexToInt();
+                            if (i < text.Length) value = (value << 4) | text[i].HexToInt();
+
                             // Is it correct?
                             builder.Append(ConvertFromUtf32(value));
                             break;
@@ -165,8 +372,9 @@ namespace Scriban.Parsing
                         case 'x':
                         {
                             i++;
-                            var value = (text[i++].HexToInt() << 4) +
-                                        text[i++].HexToInt();
+                            int value = 0;
+                            if (i < text.Length) value = text[i++].HexToInt();
+                            if (i < text.Length) value = (value << 4) | text[i].HexToInt();
                             builder.Append((char) value);
                             break;
                         }
@@ -196,7 +404,7 @@ namespace Scriban.Parsing
             var text = GetAsText(currentToken);
 
             // Return ScriptLiteral for null, true, false
-            // Return ScriptAnonymousFunction 
+            // Return ScriptAnonymousFunction
             switch (text)
             {
                 case "null":
@@ -222,7 +430,7 @@ namespace Scriban.Parsing
                     if (!_isLiquid)
                     {
                         var thisExp = Open<ScriptThisExpression>();
-                        NextToken();
+                        ExpectAndParseKeywordTo(thisExp.ThisKeyword);
                         return Close(thisExp);
                     }
                     break;
@@ -246,27 +454,32 @@ namespace Scriban.Parsing
 
                 // Convert $0, $1... $n variable into $[0] $[1]...$[n] variables
                 int index;
-                if (int.TryParse(text, out index))
+                if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out index))
                 {
+                    var target = new ScriptVariableLocal(ScriptVariable.Arguments.BaseName)
+                    {
+                        Span = currentSpan
+                    };
+                    var indexLiteral = new ScriptLiteral() {Span = currentSpan, Value = index};
+
                     var indexerExpression = new ScriptIndexerExpression
                     {
                         Span = currentSpan,
-
-                        Target = new ScriptVariableLocal(ScriptVariable.Arguments.Name)
-                        {
-                            Span = currentSpan
-                        },
-
-                        Index = new ScriptLiteral() {Span = currentSpan, Value = index}
+                        Target = target,
+                        Index = indexLiteral
                     };
 
                     if (_isKeepTrivia)
                     {
                         if (triviasBefore != null)
                         {
-                            indexerExpression.Target.AddTrivias(triviasBefore, true);
+                            target.AddTrivias(triviasBefore, true);
                         }
-                        FlushTrivias(indexerExpression.Index, false);
+
+                        // Special case, we add the trivias to the index as the [] brackets
+                        // won't be output-ed
+                        FlushTrivias(indexLiteral, false);
+                        _lastTerminalWithTrivias = indexLiteral;
                     }
 
                     return indexerExpression;
@@ -276,65 +489,23 @@ namespace Scriban.Parsing
             {
                 if (Current.Type == TokenType.Dot)
                 {
-                    NextToken();
-                    if (Current.Type == TokenType.Identifier)
+                    scope = ScriptVariableScope.Loop;
+                    var token = PeekToken();
+                    if (token.Type == TokenType.Identifier)
                     {
-                        endSpan = CurrentSpan;
-                        var loopVariableText = GetAsText(Current);
-                        NextToken();
-
-                        scope = ScriptVariableScope.Loop;
+                        //endSpan = GetSpanForToken(token);
+                        var loopVariableText = GetAsText(token);
                         if (_isLiquid)
                         {
                             switch (loopVariableText)
                             {
                                 case "first":
-                                    text = ScriptVariable.LoopFirst.Name;
-                                    break;
                                 case "last":
-                                    text = ScriptVariable.LoopLast.Name;
-                                    break;
                                 case "index0":
-                                    text = ScriptVariable.LoopIndex.Name;
-                                    break;
                                 case "rindex0":
-                                    text = ScriptVariable.LoopRIndex.Name;
-                                    break;
-                                case "rindex":
                                 case "index":
-                                    // Because forloop.index is 1 based index, we need to create a binary expression
-                                    // to support it here
-                                    bool isrindex = loopVariableText == "rindex";
-
-                                    var nested = new ScriptNestedExpression()
-                                    {
-                                        Expression = new ScriptBinaryExpression()
-                                        {
-                                            Operator = ScriptBinaryOperator.Add,
-                                            Left = new ScriptVariableLoop(isrindex ? ScriptVariable.LoopRIndex.Name : ScriptVariable.LoopIndex.Name)
-                                            {
-                                                Span = currentSpan
-                                            },
-                                            Right = new ScriptLiteral(1)
-                                            {
-                                                Span = currentSpan
-                                            },
-                                            Span = currentSpan
-                                        },
-                                        Span = currentSpan
-                                    };
-
-                                    if (_isKeepTrivia)
-                                    {
-                                        if (triviasBefore != null)
-                                        {
-                                            nested.AddTrivias(triviasBefore, true);
-                                        }
-                                        FlushTrivias(nested, false);
-                                    }
-                                    return nested;
+                                case "rindex":
                                 case "length":
-                                    text = ScriptVariable.LoopLength.Name;
                                     break;
                                 case "col":
                                     if (text != "tablerowloop")
@@ -342,62 +513,35 @@ namespace Scriban.Parsing
                                         // unit test: 108-variable-loop-error2.txt
                                         LogError(currentToken, $"The loop variable <{text}.col> is invalid");
                                     }
-                                    text = ScriptVariable.TableRowCol.Name;
                                     break;
 
                                 default:
-                                    text = text + "." + loopVariableText;
-                                    LogError(currentToken, $"The liquid loop variable <{text}> is not supported");
+                                    LogError(currentToken, $"The liquid loop variable <{text}.{loopVariableText}> is not supported");
                                     break;
                             }
+
+                            if (text == "forloop") text = "for";
+                            else if (text == "tablerowloop") text = "tablerow";
                         }
                         else
                         {
                             switch (loopVariableText)
                             {
+                                // supported by both for and while
                                 case "first":
-                                    text = ScriptVariable.LoopFirst.Name;
+                                case "even":
+                                case "odd":
+                                case "index":
                                     break;
                                 case "last":
-                                    if (text == "while")
-                                    {
-                                        // unit test: 108-variable-loop-error2.txt
-                                        LogError(currentToken, "The loop variable <while.last> is invalid");
-                                    }
-                                    text = ScriptVariable.LoopLast.Name;
-                                    break;
                                 case "changed":
-                                    if (text == "while")
-                                    {
-                                        // unit test: 108-variable-loop-error2.txt
-                                        LogError(currentToken, "The loop variable <while.changed> is invalid");
-                                    }
-                                    text = ScriptVariable.LoopChanged.Name;
-                                    break;
                                 case "length":
-                                    if (text == "while")
-                                    {
-                                        // unit test: 108-variable-loop-error2.txt
-                                        LogError(currentToken, "The loop variable <while.length> is invalid");
-                                    }
-                                    text = ScriptVariable.LoopLength.Name;
-                                    break;
-                                case "even":
-                                    text = ScriptVariable.LoopEven.Name;
-                                    break;
-                                case "odd":
-                                    text = ScriptVariable.LoopOdd.Name;
-                                    break;
-                                case "index":
-                                    text = ScriptVariable.LoopIndex.Name;
-                                    break;
                                 case "rindex":
                                     if (text == "while")
                                     {
                                         // unit test: 108-variable-loop-error2.txt
-                                        LogError(currentToken, "The loop variable <while.rindex> is invalid");
+                                        LogError(currentToken, $"The loop variable <while.{loopVariableText}> is invalid");
                                     }
-                                    text = ScriptVariable.LoopRIndex.Name;
                                     break;
                                 case "col":
                                     if (text != "tablerow")
@@ -405,25 +549,17 @@ namespace Scriban.Parsing
                                         // unit test: 108-variable-loop-error2.txt
                                         LogError(currentToken, $"The loop variable <{text}.col> is invalid");
                                     }
-                                    text = ScriptVariable.TableRowCol.Name;
                                     break;
                                 default:
-                                    text = text + "." + loopVariableText;
                                     // unit test: 108-variable-loop-error1.txt
-                                    LogError(currentToken, $"The loop variable <{text}> is not supported");
+                                    LogError(currentToken, $"The loop variable <{text}.{loopVariableText}> is not supported");
                                     break;
                             }
                         }
-
-                        // We no longer checks at parse time usage of loop variables, as they can be used in a wrap context
-                        //if (!IsInLoop())
-                        //{
-                        //    LogError(currentToken, $"Unexpected variable <{text}> outside of a loop");
-                        //}
                     }
                     else
                     {
-                        LogError(currentToken, $"Invalid token `{Current.Type}`. The loop variable <{text}> dot must be followed by an identifier");
+                        LogError(currentToken, $"Invalid token `{GetAsText(Current)}`. The loop variable <{text}> dot must be followed by an identifier");
                     }
                 }
             }
@@ -444,12 +580,13 @@ namespace Scriban.Parsing
             // If this is the case, we need to translate it to `this["this"]` instead
             if (_isLiquid && text.IndexOf('-') >= 0)
             {
+                var target = new ScriptThisExpression()
+                {
+                    Span = result.Span
+                };
                 var newExp = new ScriptIndexerExpression
                 {
-                    Target = new ScriptThisExpression()
-                    {
-                        Span = result.Span
-                    },
+                    Target = target,
                     Index = new ScriptLiteral(text)
                     {
                         Span = result.Span
@@ -462,10 +599,12 @@ namespace Scriban.Parsing
                 {
                     if (triviasBefore != null)
                     {
-                        newExp.Target.AddTrivias(triviasBefore, true);
+                        target.ThisKeyword.AddTrivias(triviasBefore, true);
                     }
-                    FlushTrivias(newExp, false);
+                    FlushTrivias(newExp.CloseBracket, false);
+                    _lastTerminalWithTrivias = newExp.CloseBracket;
                 }
+
                 // Return the expression
                 return newExp;
             }
@@ -478,7 +617,10 @@ namespace Scriban.Parsing
                     result.AddTrivias(triviasBefore, true);
                 }
                 FlushTrivias(result, false);
+
+                _lastTerminalWithTrivias = result;
             }
+
             return result;
         }
 
@@ -550,6 +692,8 @@ namespace Scriban.Parsing
                 case TokenType.Identifier:
                 case TokenType.IdentifierSpecial:
                 case TokenType.Integer:
+                case TokenType.HexaInteger:
+                case TokenType.BinaryInteger:
                 case TokenType.Float:
                 case TokenType.String:
                 case TokenType.ImplicitString:

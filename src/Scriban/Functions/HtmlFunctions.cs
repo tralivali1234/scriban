@@ -1,5 +1,5 @@
 // Copyright (c) Alexandre Mutel. All rights reserved.
-// Licensed under the BSD-Clause 2 license. 
+// Licensed under the BSD-Clause 2 license.
 // See license.txt file in the project root for full license information.
 
 using System;
@@ -11,13 +11,15 @@ namespace Scriban.Functions
     /// <summary>
     /// Html functions available through the builtin object 'html'.
     /// </summary>
-    public class HtmlFunctions : ScriptObject
+#if SCRIBAN_PUBLIC
+    public
+#else
+    internal
+#endif
+    class HtmlFunctions : ScriptObject
     {
         // From https://stackoverflow.com/a/17668453/1356325
         private const string RegexMatchHtml = @"<script.*?</script>|<!--.*?-->|<style.*?</style>|<(?:[^>=]|='[^']*'|=""[^""]*""|=[^'""][^\s>]*)*>";
-#if NET35 || NET40 || PCL328
-        private static readonly Regex stripHtml = new Regex(RegexMatchHtml, RegexOptions.IgnoreCase | RegexOptions.Singleline);
-#endif
 
         /// <summary>
         /// Removes any HTML tags from the input string
@@ -39,14 +41,10 @@ namespace Scriban.Functions
             {
                 return text;
             }
-#if !NET35 && !NET40 && !PCL328
             var stripHtml = new Regex(RegexMatchHtml, RegexOptions.IgnoreCase|RegexOptions.Singleline, context.RegexTimeOut);
-#endif
-
             return stripHtml.Replace(text, string.Empty);
         }
 
-#if !PCL328
         /// <summary>
         /// Escapes a HTML input string (replacing `&amp;` by `&amp;amp;`)
         /// </summary>
@@ -66,11 +64,7 @@ namespace Scriban.Functions
             {
                 return text;
             }
-#if NET35
-            return System.Web.HttpUtility.HtmlEncode(text);
-#else
             return System.Net.WebUtility.HtmlEncode(text);
-#endif
         }
 
         /// <summary>
@@ -116,22 +110,5 @@ namespace Scriban.Functions
             }
             return Uri.EscapeUriString(text);
         }
-#else
-
-        public static string Escape(string text)
-        {
-            throw new NotSupportedException("This method is not supported by this .NET profile");
-        }
-        
-        public static string UrlEncode(string text)
-        {
-            throw new NotSupportedException("This method is not supported by this .NET profile");
-        }
-
-        public static string UrlEscape(string text)
-        {
-            throw new NotSupportedException("This method is not supported by this .NET profile");
-        }
-#endif
     }
 }
